@@ -1,0 +1,53 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html {
+  scroll-behavior: smooth;
+  /* Default (English): Poppins. LocaleProvider sets data-locale="th" on
+     <html> when Thai is active, which swaps this to Prompt below - see
+     tailwind.config.ts, where fontFamily.heading/body reference this
+     variable instead of a font name directly. */
+  --font-active: var(--font-poppins);
+}
+
+html[data-locale="th"] {
+  --font-active: var(--font-prompt);
+}
+
+body {
+  background-color: #FFFFFF;
+  color: #3A3834;
+}
+
+* {
+  border-color: #D8C8AD;
+}
+
+/* Printing (e.g. the admin dashboard's Print button): hide site chrome and
+   anything explicitly marked .no-print, and reveal .print-only elements
+   that stay hidden the rest of the time. */
+.print-only {
+  display: none;
+}
+
+@media print {
+  header,
+  aside,
+  footer,
+  .no-print {
+    display: none !important;
+  }
+
+  .print-only {
+    display: block;
+  }
+
+  body {
+    background-color: #ffffff;
+  }
+
+  main {
+    padding: 0 !important;
+  }
+}

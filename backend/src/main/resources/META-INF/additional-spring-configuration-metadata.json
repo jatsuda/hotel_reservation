@@ -1,0 +1,19 @@
+{
+  "properties": [
+    {
+      "name": "jwt.secret",
+      "type": "java.lang.String",
+      "description": "HMAC signing key used to sign and verify JWT access tokens. Must be kept private and be at least 32 bytes long for HS256."
+    },
+    {
+      "name": "jwt.expiration-ms",
+      "type": "java.lang.Long",
+      "description": "How long an issued JWT access token remains valid, in milliseconds."
+    },
+    {
+      "name": "app.cors.allowed-origins",
+      "type": "java.lang.String",
+      "description": "Comma-separated list of frontend origins allowed to call this API from a browser."
+    }
+  ]
+}

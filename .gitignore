@@ -1,0 +1,17 @@
+# secrets / local config - never commit
+.env
+.env.*
+!.env.local.example
+backend/src/main/resources/application-local.properties
+
+# build output / dependencies
+node_modules/
+.next/
+backend/target/
+*.log
+.idea/
+.vscode/
+
+# uploaded photos (local storage)
+backend/uploads/
+uploads/
