@@ -284,7 +284,10 @@ export default function HotelMap({ name, latitude, longitude, className = "" }: 
           <Navigation className="h-3.5 w-3.5 text-primary" /> Get directions
         </p>
 
-        <form onSubmit={handleAddressSubmit} className="mt-2 flex flex-col gap-2 sm:flex-row">
+        {/* Always stacked: this card sits in the narrow right-hand column, so a side-by-side
+            layout at the `sm` breakpoint (which looks at the SCREEN width, not the card
+            width) pushed the button out of the card. */}
+        <form onSubmit={handleAddressSubmit} className="mt-2 flex flex-col gap-2">
           <input
             value={address}
             onChange={(e) => {
@@ -292,14 +295,14 @@ export default function HotelMap({ name, latitude, longitude, className = "" }: 
               setOrigin(null);
             }}
             placeholder="Enter your address"
-            className="flex-1 rounded-control border border-secondary/60 bg-white px-3 py-2 text-sm text-text focus:border-primary focus:outline-none"
+            className="w-full min-w-0 rounded-control border border-secondary/60 bg-white px-3 py-2 text-sm text-text focus:border-primary focus:outline-none"
           />
           <div className="flex gap-2">
             <button
               type="button"
               onClick={handleUseMyLocation}
               disabled={locating || routePending}
-              className="flex items-center gap-1.5 whitespace-nowrap rounded-control border border-secondary/60 px-3 py-2 text-xs font-medium text-text hover:bg-secondary/30 disabled:opacity-50"
+              className="flex flex-1 items-center justify-center gap-1.5 rounded-control border border-secondary/60 px-3 py-2 text-xs font-medium text-text hover:bg-secondary/30 disabled:opacity-50"
             >
               <Locate className="h-3.5 w-3.5" />{" "}
               {locating ? "Locating..." : routePending ? "Finding route..." : "Use my location"}
