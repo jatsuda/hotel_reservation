@@ -1,174 +1,179 @@
-# Hotel Reservation System
+# ระบบจองโรงแรม (Hotel Reservation System)
 
-A full-stack hotel reservation system with a real, working connection between
-frontend, backend, and database — no mock data. Built to a "modern luxury
-hotel" earth-tone design.
+ระบบจองโรงแรมแบบ Full-stack ที่มีการเชื่อมต่อระหว่าง Frontend, Backend และฐานข้อมูลจริงที่ใช้งานได้ โดยไม่มีการใช้ข้อมูลจำลอง (Mock Data) และออกแบบด้วยแนวทางโรงแรมหรูสมัยใหม่ โดยใช้โทนสีเอิร์ธโทน
 
 ```
-Next.js (frontend)  --REST-->  Spring Boot (backend)  --JPA/Hibernate-->  MySQL
+Next.js (Frontend) --REST--> Spring Boot (Backend) --JPA/Hibernate--> MySQL
 ```
 
----
+## 1. ภาพรวมของโปรเจกต์ (Project Overview)
 
-## 1. Project Overview
+ผู้เข้าพักสามารถเรียกดูโรงแรม ดูห้องพัก และจองการเข้าพักได้ตั้งแต่ขั้นตอนค้นหาไปจนถึงการชำระเงินและการยืนยันการจอง
 
-Guests can browse hotels, view rooms, and book a stay from search to payment
-and confirmation. Admins can manage hotels, rooms, and reservations from a
-dashboard. Every create/update goes to MySQL through the Spring Boot API —
-refreshing the page never loses data.
+ผู้ดูแลระบบสามารถจัดการโรงแรม ห้องพัก และการจองผ่านแดชบอร์ดได้
 
-## 2. Tech Stack
+การสร้างหรืออัปเดตข้อมูลทุกครั้งจะถูกส่งไปยังฐานข้อมูล MySQL ผ่าน Spring Boot API ดังนั้นเมื่อรีเฟรชหน้าเว็บ ข้อมูลจะไม่สูญหาย
 
-| Layer     | Technology                                                   |
-|-----------|---------------------------------------------------------------|
-| Backend   | Java 17, Spring Boot 3, Spring Web (REST), Spring Data JPA, Hibernate, Spring Security + JWT, Maven |
-| Database  | MySQL 8                                                        |
-| Frontend  | Next.js 14 (App Router), React 18, TypeScript, Tailwind CSS   |
+## 2. เทคโนโลยีที่ใช้ (Tech Stack)
 
-## 3. System Architecture
+| ส่วนของระบบ | เทคโนโลยี                                                                                           |
+| ----------- | --------------------------------------------------------------------------------------------------- |
+| Backend     | Java 17, Spring Boot 3, Spring Web (REST), Spring Data JPA, Hibernate, Spring Security + JWT, Maven |
+| ฐานข้อมูล   | MySQL 8                                                                                             |
+| Frontend    | Next.js 14 (App Router), React 18, TypeScript, Tailwind CSS                                         |
+
+## 3. สถาปัตยกรรมของระบบ (System Architecture)
 
 ```
 Next.js (:3000)
-     |  fetch() via lib/api.ts
+     | fetch() ผ่าน lib/api.ts
      v
 Spring Boot REST Controllers (:8080/api/**)
      |
-Service layer (business rules: overlap check, capacity, pricing)
+     v
+Service layer (กฎทางธุรกิจ: ตรวจสอบช่วงเวลาทับซ้อน ความจุ และราคา)
      |
+     v
 Spring Data JPA Repositories
      |
+     v
 Hibernate
      |
+     v
 MySQL (hotel_reservation)
 ```
 
-Layered backend: **Controller → Service → Repository → MySQL**.
-Frontend never talks to the database directly — everything goes through the
-REST API, and all `fetch` calls live in `frontend/lib/api.ts`.
+Backend ใช้สถาปัตยกรรมแบบแบ่งชั้น (Layered Architecture) ดังนี้
 
-## 4. Database ER Diagram
+Controller → Service → Repository → MySQL
+
+Frontend จะไม่เชื่อมต่อกับฐานข้อมูลโดยตรง ทุกอย่างต้องผ่าน REST API และคำสั่ง `fetch` ทั้งหมดจะอยู่ในไฟล์ `frontend/lib/api.ts`
+
+## 4. แผนภาพความสัมพันธ์ของฐานข้อมูล (Database ER Diagram)
 
 ```
 User (1) ─(1:1)─ Guest (1) ───< Reservation >─── (1) Room ───> (1) Hotel
-                                     |    |                        │
-                                   (1:1) (1:1)                     │
-                                     v    v                        │
-                                  Payment Review ───────────────> (Hotel)
-                                     |                              │
-                                   (1:1)                            │
-                                     v                              │
-                                  Payout ─────────────────────> (Hotel)
-                                                                    │
-                                                                    └───< RoomAmenity
+                                      |    |                        |
+                                    (1:1) (1:1)                     |
+                                      v    v                        |
+                                   Payment Review ───────────────> (Hotel)
+                                      |                              |
+                                    (1:1)                            |
+                                      v                              |
+                                   Payout ─────────────────────> (Hotel)
+                                                                     |
+                                                                     └───< RoomAmenity
 ```
 
-- **User → Guest**: one-to-one (only for GUEST-role users; ADMIN users have no linked Guest)
-- **Hotel → Room**: one-to-many
-- **Room → RoomAmenity**: one-to-many (grouped by category: Bed, Technology, Bathroom, Accessibility, Kitchen)
-- **Guest → Reservation**: one-to-many
-- **Room → Reservation**: one-to-many
-- **Reservation → Payment**: one-to-one
-- **Reservation → Review**: one-to-one (a stay can only be reviewed once, and only after it's `CHECKED_OUT`)
-- **Hotel → Review**: one-to-many (denormalized onto the row for a fast `AVG(rating)` lookup - see Section 10)
-- **Payment → Payout**: one-to-one (the platform is a payment intermediary - see Section 10's Payouts section)
-- **Hotel → Payout**: one-to-many
+ความสัมพันธ์ระหว่างตารางมีดังนี้
 
-See `database/schema.sql` for full column definitions and seed data.
+- User → Guest: ความสัมพันธ์แบบหนึ่งต่อหนึ่ง (One-to-One) โดยใช้เฉพาะบัญชีผู้ใช้ที่มีบทบาท `GUEST` เท่านั้น ส่วนบัญชี `ADMIN` จะไม่มี `Guest` ที่เชื่อมโยงอยู่
+- Hotel → Room: ความสัมพันธ์แบบหนึ่งต่อหลาย (One-to-Many)
+- Room → RoomAmenity: ความสัมพันธ์แบบหนึ่งต่อหลาย โดยแบ่งสิ่งอำนวยความสะดวกตามหมวดหมู่ ได้แก่ เตียง (Bed), เทคโนโลยี (Technology), ห้องน้ำ (Bathroom), การเข้าถึงสำหรับผู้มีข้อจำกัด (Accessibility) และห้องครัว (Kitchen)
+- Guest → Reservation: ความสัมพันธ์แบบหนึ่งต่อหลาย
+- Room → Reservation: ความสัมพันธ์แบบหนึ่งต่อหลาย
+- Reservation → Payment: ความสัมพันธ์แบบหนึ่งต่อหนึ่ง
+- Reservation → Review: ความสัมพันธ์แบบหนึ่งต่อหนึ่ง โดยการเข้าพักหนึ่งครั้งสามารถรีวิวได้เพียงครั้งเดียว และต้องดำเนินการหลังจากสถานะการเข้าพักเป็น `CHECKED_OUT` แล้วเท่านั้น
+- Hotel → Review: ความสัมพันธ์แบบหนึ่งต่อหลาย โดยเก็บข้อมูลที่คำนวณไว้ล่วงหน้า (Denormalized) ลงในแถวข้อมูล เพื่อให้สามารถค้นหาค่าเฉลี่ยด้วย `AVG(rating)` ได้รวดเร็วขึ้น ดูรายละเอียดในหัวข้อ 10
+- Payment → Payout: ความสัมพันธ์แบบหนึ่งต่อหนึ่ง โดยแพลตฟอร์มทำหน้าที่เป็นตัวกลางรับชำระเงิน ดูรายละเอียดในหัวข้อ Payouts ของหัวข้อ 10
+- Hotel → Payout: ความสัมพันธ์แบบหนึ่งต่อหลาย
 
-## 5. Authentication & Authorization
+ดูรายละเอียดคอลัมน์ทั้งหมดและข้อมูลเริ่มต้น (Seed Data) ได้ในไฟล์ `database/schema.sql`
 
-Login is real: Spring Security validates credentials against the `users`
-table (BCrypt-hashed passwords) and issues a JWT, which the frontend stores
-and sends as `Authorization: Bearer {token}` on every subsequent request.
+## 5. การยืนยันตัวตนและการกำหนดสิทธิ์ (Authentication & Authorization)
 
-**Browsing never requires login; booking always does.** Anyone can view the
-homepage, hotel lists, hotel details, and room details without an account —
-those pages call only public endpoints. The moment someone tries to actually
-reserve a room, `components/RoomBookingCta.tsx` checks the client's auth
-state: logged-in users go straight to `/booking`, everyone else is sent to
-`/login?redirect=/booking?roomId={id}` and bounced back to the booking page
-right after logging in. The `/booking`, `/payment`, and `/reservations`
-pages each also redirect to `/login` on their own if visited directly while
-logged out, so there's no way to reach the booking/payment flow unauthenticated
-even by typing the URL directly.
+ระบบเข้าสู่ระบบใช้งานได้จริง โดย Spring Security จะตรวจสอบข้อมูลรับรองการเข้าสู่ระบบกับตาราง `users` ซึ่งเก็บรหัสผ่านในรูปแบบแฮชด้วย BCrypt จากนั้นระบบจะออก JWT (JSON Web Token) ให้แก่ผู้ใช้ โดย Frontend จะจัดเก็บโทเคนนี้และส่งไปกับคำขอทุกครั้งหลังจากนั้นผ่านส่วนหัว HTTP ดังนี้
 
-**Why `User` is separate from `Guest`**: `Guest` already existed as the
-booking/profile record referenced by `Reservation`. Rather than reshape that
-relationship, `User` (the login identity) holds a one-to-one link to `Guest`
-for GUEST-role accounts. Signing up via `/api/auth/register` creates both
-rows together. An ADMIN account has no linked `Guest`.
+```
+Authorization: Bearer {token}
+```
 
-### Route authorization matrix
+การเรียกดูข้อมูลไม่จำเป็นต้องเข้าสู่ระบบ แต่การจองต้องเข้าสู่ระบบเสมอ
 
-| Access level | Routes |
-|---|---|
-| **Public** | `POST /api/auth/register`, `POST /api/auth/login`, `GET /api/hotels/**`, `GET /api/rooms/**`, `GET /api/reservations/room/{id}/upcoming` (booked dates + first name & last initial only), `GET /api/reviews/hotel/**` |
-| **Authenticated** (any role) | `GET /api/auth/me`, `POST /api/reservations` (a GUEST can only book for their own guest profile; only ADMIN can book for someone else), `GET/POST /api/reservations/{id}`, `POST /api/reservations/{id}/cancel`, `POST /api/payments`, `GET /api/reservations/me`, `GET /api/reviews/me`, `GET /api/reviews/reviewable`, `POST /api/reviews`, `PUT/DELETE /api/reviews/{id}` (own review; a hotel's ADMIN/HOTEL_OWNER/permitted HOTEL_STAFF may also delete/moderate one) |
-| **ADMIN, HOTEL_OWNER, or HOTEL_STAFF** | `POST/PUT/PATCH/DELETE /api/rooms/**`, `PUT /api/hotels/**`, `GET /api/reservations` (full list), `PUT /api/reservations/**`, check-in/check-out, `GET /api/payouts/hotel/**`, `GET /api/hotels/{id}/commission-rate` - each narrowed in the service layer to "their own hotel only" (and, for HOTEL_STAFF, the specific `Permission` they were granted - see `CurrentUserProvider`) |
-| **ADMIN or HOTEL_OWNER** | `/api/staff/**` (managing that hotel's HOTEL_STAFF accounts) |
-| **ADMIN only** | `POST/DELETE /api/hotels/**`, `GET /api/guests/**`, `DELETE /api/reservations/**`, `GET/PUT /api/payments/**`, `GET /api/payouts`, `GET /api/payouts/summary`, `POST /api/payouts/{id}/pay`, `PATCH /api/hotels/{id}/commission-rate` |
+ทุกคนสามารถดูหน้าแรก รายการโรงแรม รายละเอียดโรงแรม และรายละเอียดห้องพักได้โดยไม่ต้องมีบัญชี เนื่องจากหน้าเหล่านี้เรียกใช้เฉพาะ Public Endpoints เท่านั้น
 
-Ownership is double-enforced: Spring Security's route matchers gate broad
-categories (e.g. "must be logged in"), and the service layer
-(`ReservationService`/`PaymentService`) checks that a GUEST can only read,
-cancel, or pay for **their own** reservations — an ADMIN can act on any.
+เมื่อผู้ใช้พยายามจองห้องพักจริง คอมโพเนนต์ `components/RoomBookingCta.tsx` จะตรวจสอบสถานะการยืนยันตัวตนของผู้ใช้บนฝั่ง Client ดังนี้
 
-### Frontend session handling
+- หากเข้าสู่ระบบแล้ว ระบบจะพาไปยังหน้า `/booking` โดยตรง
+- หากยังไม่ได้เข้าสู่ระบบ ระบบจะพาไปยัง `/login?redirect=/booking?roomId={id}` และหลังจากเข้าสู่ระบบสำเร็จ ระบบจะพากลับไปยังหน้าจองห้องพักที่ต้องการโดยอัตโนมัติ
 
-- The JWT lives in `localStorage` and is attached automatically by
-  `frontend/lib/api.ts` on every request.
-- The user's role is mirrored into a plain cookie (`hotel_auth_role`) purely
-  so `middleware.ts` can redirect non-admins away from `/admin/**` before the
-  page renders. **This cookie is not the real security boundary** — a user
-  could edit it in devtools, but every `/admin` API call is still checked
-  server-side by Spring Security regardless of what the cookie says.
-- `app/admin/layout.tsx` adds a client-side check as a second line of
-  defense (covers the moment right after login before the cookie is set).
+หน้า `/booking`, `/payment` และ `/reservations` ต่างก็มีการเปลี่ยนเส้นทางไปยัง `/login` ด้วยตัวเองเช่นกัน หากมีผู้เปิดหน้าเหล่านี้โดยตรงในขณะที่ยังไม่ได้เข้าสู่ระบบ ดังนั้นจึงไม่สามารถเข้าถึงขั้นตอนการจองหรือชำระเงินได้โดยไม่มีการยืนยันตัวตน แม้จะพิมพ์ URL เข้าไปโดยตรงก็ตาม
 
-### Security hardening
+### เหตุใด `User` จึงแยกออกจาก `Guest`
 
-| Area | What the backend does |
-|---|---|
-| **Login brute force** | `POST /api/auth/login` allows 5 failed attempts per client IP + email and 30 per IP in 15 minutes, then answers `429 Too Many Requests` (`LoginRateLimiter`, in-memory - use a shared store/gateway if you run several instances; behind a reverse proxy set `server.forward-headers-strategy` so the real client IP is seen) |
-| **Passwords** | 8-72 characters with at least one letter and one number (register, change password, staff creation); stored as BCrypt hashes |
-| **JWT secret** | Read from `JWT_SECRET`. No default is shipped; if it is empty a random key is generated at startup, and a key under 32 bytes (or the old public placeholder) stops the app from starting |
-| **Reservation privacy** | `GET /api/reservations?guestId=` is scoped: ADMIN sees all, a hotel owner/staff only that guest's bookings **at their own hotel**, a guest only their own. The public `/room/{id}/upcoming` endpoint returns dates and "First L." only - no email, phone, address or payment data |
-| **Booking / payment rules** | Only a GUEST (for themselves) or ADMIN can create a reservation; only a `PENDING` reservation can be paid; the raw `status` on `PUT /api/reservations/{id}` accepts only `PENDING`/`CONFIRMED` and closed (cancelled / checked-in / checked-out) reservations can't be edited; dates can't change after payment; a guest can't self-cancel (and self-refund) a stay that is already checked in; row locks stop two requests double-booking a room or double-paying a reservation |
-| **Errors** | Unexpected errors return a generic 500 body (details go to the server log only); malformed JSON returns a fixed 400 message |
-| **HTTP** | CORS limited to `Authorization`, `Content-Type`, `Accept`; `X-Frame-Options: DENY`, `nosniff`, `Referrer-Policy: no-referrer` and an API-only CSP on every response; every route outside `/api` is denied by default |
-| **Logging** | SQL logging is off by default (`SPRING_JPA_SHOW_SQL=true` to enable); seeded passwords are never logged |
+เดิมที `Guest` มีอยู่แล้วในฐานะระเบียนข้อมูลการจองและโปรไฟล์ผู้เข้าพัก ซึ่งถูกอ้างอิงโดย `Reservation` แทนที่จะปรับเปลี่ยนความสัมพันธ์เดิม ระบบจึงสร้าง `User` ขึ้นมาเพื่อใช้เป็นข้อมูลระบุตัวตนสำหรับการเข้าสู่ระบบ โดยบัญชีที่มีบทบาท `GUEST` จะมีความสัมพันธ์แบบหนึ่งต่อหนึ่งกับ `Guest`
 
-Known limits you should still address before a real launch: the JWT is kept in
-`localStorage` (an XSS bug would expose it - an httpOnly cookie session is the
-hardened alternative); tokens stay valid until expiry even after a password
-change; and `PaymentService` is a **simulated** gateway that marks any well-formed
-payment as paid - connect a real provider (Stripe, Omise, ...) and verify
-its webhook before taking real money.
+การสมัครสมาชิกผ่าน `/api/auth/register` จะสร้างข้อมูลทั้งสองแถวพร้อมกัน ส่วนบัญชี `ADMIN` จะไม่มี `Guest` ที่เชื่อมโยงอยู่
 
-## 6. Database Setup
+### ตารางกำหนดสิทธิ์การเข้าถึงแต่ละเส้นทาง (Route Authorization Matrix)
 
-```sql
+| ระดับสิทธิ์                                      | เส้นทางที่เข้าถึงได้                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Public — สาธารณะ                                 | `POST /api/auth/register`, `POST /api/auth/login`, `GET /api/hotels/**`, `GET /api/rooms/**`, `GET /api/reservations/room/{id}/upcoming` (วันที่มีการจอง พร้อมชื่อจริงและอักษรแรกของนามสกุลเท่านั้น), `GET /api/reviews/hotel/**`                                                                                                                                                                                                                                                                      |
+| Authenticated — ผู้ใช้ที่เข้าสู่ระบบแล้วทุกบทบาท | `GET /api/auth/me`, `POST /api/reservations` (ผู้ใช้ `GUEST` จองได้เฉพาะโปรไฟล์ผู้เข้าพักของตนเอง ส่วน `ADMIN` สามารถจองให้บุคคลอื่นได้), `GET/POST /api/reservations/{id}`, `POST /api/reservations/{id}/cancel`, `POST /api/payments`, `GET /api/reservations/me`, `GET /api/reviews/me`, `GET /api/reviews/reviewable`, `POST /api/reviews`, `PUT/DELETE /api/reviews/{id}` (รีวิวของตนเอง โดย `ADMIN`/`HOTEL_OWNER`/`HOTEL_STAFF` ที่ได้รับอนุญาตของโรงแรมนั้น สามารถลบหรือดูแลจัดการรีวิวได้ด้วย) |
+| ADMIN, HOTEL_OWNER หรือ HOTEL_STAFF              | `POST/PUT/PATCH/DELETE /api/rooms/**`, `PUT /api/hotels/**`, `GET /api/reservations` (รายการจองทั้งหมด), `PUT /api/reservations/**`, การเช็กอิน/เช็กเอาต์, `GET /api/payouts/hotel/**`, `GET /api/hotels/{id}/commission-rate` โดยทุกเส้นทางจะถูกจำกัดเพิ่มเติมใน Service Layer ให้เข้าถึงได้เฉพาะโรงแรมของตนเอง และสำหรับ `HOTEL_STAFF` ต้องมี `Permission` ที่ได้รับมอบหมายด้วย ดู `CurrentUserProvider`                                                                                             |
+| ADMIN หรือ HOTEL_OWNER                           | `/api/staff/**` สำหรับจัดการบัญชี `HOTEL_STAFF` ของโรงแรมนั้น                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| ADMIN เท่านั้น                                   | `POST/DELETE /api/hotels/**`, `GET /api/guests/**`, `DELETE /api/reservations/**`, `GET/PUT /api/payments/**`, `GET /api/payouts`, `GET /api/payouts/summary`, `POST /api/payouts/{id}/pay`, `PATCH /api/hotels/{id}/commission-rate`                                                                                                                                                                                                                                                                  |
+
+การตรวจสอบความเป็นเจ้าของทรัพยากรมีการบังคับใช้สองชั้น
+
+Spring Security จะตรวจสอบสิทธิ์ในระดับเส้นทางก่อน เช่น กำหนดว่าต้องเข้าสู่ระบบ ส่วน Service Layer ได้แก่ `ReservationService` และ `PaymentService` จะตรวจสอบเพิ่มเติมว่า `GUEST` สามารถอ่าน ยกเลิก หรือชำระเงินสำหรับการจองของ ตนเองเท่านั้น ขณะที่ `ADMIN` สามารถดำเนินการกับการจองใดก็ได้
+
+### การจัดการเซสชันฝั่ง Frontend (Frontend Session Handling)
+
+- JWT จะถูกเก็บไว้ใน `localStorage` และแนบไปกับทุกคำขอโดยอัตโนมัติผ่าน `frontend/lib/api.ts`
+- บทบาทของผู้ใช้จะถูกบันทึกซ้ำลงในคุกกี้ธรรมดาชื่อ `hotel_auth_role` โดยมีจุดประสงค์เพียงเพื่อให้ `middleware.ts` สามารถเปลี่ยนเส้นทางผู้ที่ไม่ใช่ผู้ดูแลระบบออกจาก `/admin/**` ได้ก่อนที่หน้าจะถูกแสดงผล
+
+  คุกกี้นี้ไม่ใช่กลไกความปลอดภัยหลัก เพราะผู้ใช้สามารถแก้ไขค่าใน Developer Tools ได้ แต่ทุกคำขอ API ภายใต้ `/admin` ยังคงถูกตรวจสอบฝั่งเซิร์ฟเวอร์โดย Spring Security ไม่ว่าคุกกี้จะมีค่าใดก็ตาม
+- `app/admin/layout.tsx` เพิ่มการตรวจสอบฝั่ง Client อีกชั้นหนึ่ง เพื่อรองรับช่วงเวลาทันทีหลังเข้าสู่ระบบ ก่อนที่คุกกี้จะถูกตั้งค่า
+
+### การเสริมความปลอดภัย (Security Hardening)
+
+| ด้าน                                                     | สิ่งที่ Backend ดำเนินการ                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| -------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| การลองเข้าสู่ระบบซ้ำเพื่อเดารหัสผ่าน (Login Brute Force) | `POST /api/auth/login` อนุญาตให้ลองผิดได้ 5 ครั้งต่อคู่ IP ของ Client และอีเมล และ 30 ครั้งต่อ IP ภายใน 15 นาที หลังจากนั้นจะตอบกลับด้วย `429 Too Many Requests` โดยใช้ `LoginRateLimiter` ซึ่งเก็บข้อมูลในหน่วยความจำ หากใช้งานหลาย Instance ควรใช้พื้นที่จัดเก็บข้อมูลหรือ Gateway ร่วมกัน และเมื่ออยู่หลัง Reverse Proxy ควรกำหนด `server.forward-headers-strategy` เพื่อให้ระบบตรวจพบ IP จริงของ Client                                                                            |
+| รหัสผ่าน                                                 | ต้องมีความยาว 8–72 ตัวอักษร และมีตัวอักษรอย่างน้อยหนึ่งตัวกับตัวเลขอย่างน้อยหนึ่งตัว ครอบคลุมการสมัครสมาชิก การเปลี่ยนรหัสผ่าน และการสร้างบัญชีพนักงาน โดยจัดเก็บเป็นแฮช BCrypt                                                                                                                                                                                                                                                                                                        |
+| JWT Secret                                               | อ่านค่าจาก `JWT_SECRET` ไม่มีการกำหนดค่าเริ่มต้นไว้ในโค้ด หากค่านี้ว่าง ระบบจะสร้างคีย์แบบสุ่มเมื่อเริ่มต้นทำงาน และหากคีย์มีความยาวน้อยกว่า 32 ไบต์ หรือเป็นค่า Placeholder สาธารณะแบบเก่า ระบบจะไม่ยอมเริ่มทำงาน                                                                                                                                                                                                                                                                     |
+| ความเป็นส่วนตัวของการจอง                                 | `GET /api/reservations?guestId=` จะจำกัดข้อมูลตามสิทธิ์ โดย `ADMIN` เห็นทั้งหมด เจ้าของโรงแรมหรือพนักงานเห็นเฉพาะการจองของผู้เข้าพักรายนั้นที่โรงแรมของตนเอง และผู้เข้าพักเห็นเฉพาะการจองของตนเอง ส่วน Public Endpoint `/room/{id}/upcoming` จะส่งคืนเฉพาะวันที่และชื่อในรูปแบบ `"First L."` โดยไม่มีอีเมล หมายเลขโทรศัพท์ ที่อยู่ หรือข้อมูลการชำระเงิน                                                                                                                               |
+| กฎการจองและการชำระเงิน                                   | อนุญาตให้สร้างการจองได้เฉพาะ `GUEST` ที่จองให้ตนเอง หรือ `ADMIN` เท่านั้น ชำระเงินได้เฉพาะการจองสถานะ `PENDING` คำขอ `PUT /api/reservations/{id}` ที่แก้ไขค่า `status` โดยตรงยอมรับเฉพาะ `PENDING`/`CONFIRMED` และไม่สามารถแก้ไขการจองที่ปิดแล้ว เช่น ยกเลิก เช็กอิน หรือเช็กเอาต์ได้ วันที่ไม่สามารถเปลี่ยนหลังชำระเงินแล้ว ผู้เข้าพักไม่สามารถยกเลิกและรับเงินคืนด้วยตนเองเมื่อเช็กอินแล้ว และการล็อกแถวข้อมูล (Row Locks) ช่วยป้องกันคำขอสองรายการจองห้องเดียวกันซ้ำหรือชำระเงินซ้ำ |
+| ข้อผิดพลาด                                               | ข้อผิดพลาดที่ไม่คาดคิดจะส่งคืนเนื้อหา HTTP 500 แบบทั่วไป โดยรายละเอียดจะอยู่ในบันทึกของเซิร์ฟเวอร์เท่านั้น ส่วน JSON ที่มีรูปแบบไม่ถูกต้องจะส่งข้อความ HTTP 400 ที่กำหนดไว้ตายตัว                                                                                                                                                                                                                                                                                                      |
+| HTTP                                                     | จำกัด CORS ให้ใช้เฉพาะ `Authorization`, `Content-Type` และ `Accept` กำหนด `X-Frame-Options: DENY`, `nosniff`, `Referrer-Policy: no-referrer` และ CSP สำหรับ API ในทุกการตอบกลับ และปฏิเสธทุกเส้นทางที่อยู่นอก `/api` โดยปริยาย                                                                                                                                                                                                                                                         |
+| Logging                                                  | ปิดการบันทึกคำสั่ง SQL ไว้เป็นค่าเริ่มต้น สามารถเปิดได้ด้วย `SPRING_JPA_SHOW_SQL=true` ขณะดีบัก และจะไม่บันทึกรหัสผ่านของบัญชีเริ่มต้นลงใน Log                                                                                                                                                                                                                                                                                                                                         |
+
+ข้อจำกัดที่ทราบและควรแก้ไขก่อนเปิดใช้งานจริง ได้แก่
+
+1. JWT ถูกเก็บไว้ใน `localStorage` หากเกิดช่องโหว่ XSS โทเคนอาจถูกขโมยได้ ทางเลือกที่ปลอดภัยกว่า คือการใช้เซสชันผ่านคุกกี้ `httpOnly`
+2. โทเคนยังคงใช้งานได้จนกว่าจะหมดอายุ แม้ว่าจะมีการเปลี่ยนรหัสผ่านแล้วก็ตาม
+3. `PaymentService` เป็นระบบจำลองการชำระเงิน โดยจะทำเครื่องหมายว่าชำระเงินแล้วเมื่อได้รับข้อมูลการชำระเงินที่มีรูปแบบถูกต้องทุกครั้ง ควรเชื่อมต่อผู้ให้บริการชำระเงินจริง เช่น Stripe หรือ Omise และตรวจสอบ Webhook ของผู้ให้บริการก่อนรับเงินจริง
+
+## 6. การตั้งค่าฐานข้อมูล (Database Setup)
+
+สร้างฐานข้อมูลด้วยคำสั่ง SQL ดังนี้
+
+```
 CREATE DATABASE hotel_reservation;
 ```
 
-Then either:
-- Let Hibernate create the tables automatically (see `ddl-auto=update` below), **or**
-- Run the full script for schema + seed data:
+จากนั้นเลือกวิธีใดวิธีหนึ่งต่อไปนี้
 
-```bash
+- ปล่อยให้ Hibernate สร้างตารางโดยอัตโนมัติ โดยดูการตั้งค่า `ddl-auto=update` ในหัวข้อถัดไป
+- หรือเรียกใช้สคริปต์ทั้งหมดเพื่อสร้างโครงสร้างฐานข้อมูลและเพิ่มข้อมูลเริ่มต้น
+
+```
 mysql -u root -p < database/schema.sql
 ```
 
-## 7. Backend Setup
+## 7. การตั้งค่า Backend (Backend Setup)
 
-```bash
+เข้าไปยังโฟลเดอร์ Backend
+
+```
 cd backend
 ```
 
-Edit `src/main/resources/application.properties` and set your local MySQL
-credentials:
+แก้ไขไฟล์ `src/main/resources/application.properties` แล้วกำหนดข้อมูลสำหรับเชื่อมต่อ MySQL ในเครื่องของคุณ
 
-```properties
+```
 spring.datasource.url=jdbc:mysql://localhost:3306/hotel_reservation?useSSL=false&serverTimezone=UTC
 spring.datasource.username=root
 spring.datasource.password=YOUR_PASSWORD
@@ -179,413 +184,472 @@ spring.jpa.show-sql=false
 server.port=8080
 ```
 
-> Never commit a real production password. Use environment variables or a
-> secrets manager in production.
+> ห้าม Commit รหัสผ่านจริงของระบบ Production ลงใน Repository ควรใช้ Environment Variables หรือ Secrets Manager เมื่อใช้งานจริง
 
-Run it:
+เริ่มต้นระบบด้วยคำสั่ง
 
-```bash
+```
 mvn spring-boot:run
 ```
 
-The API is now live at `http://localhost:8080/api`.
+API จะพร้อมใช้งานที่
 
-## 8. Frontend Setup
+`http://localhost:8080/api`
 
-```bash
+## 8. การตั้งค่า Frontend (Frontend Setup)
+
+เข้าไปยังโฟลเดอร์ Frontend และติดตั้ง Dependencies
+
+```
 cd frontend
 npm install
 ```
 
-Create `.env.local` (a `.env.local.example` is provided):
+สร้างไฟล์ `.env.local` โดยมีไฟล์ตัวอย่างชื่อ `.env.local.example` ให้ใช้อ้างอิง
 
 ```
 NEXT_PUBLIC_API_URL=http://localhost:8080/api
 NEXT_PUBLIC_LONGDO_MAP_KEY=your-key-here
 ```
 
-The Longdo Map key powers the small map + directions widget on each Hotel
-Detail page (`components/HotelMap.tsx`, loaded as a plain `<script>` from
-`https://api.longdo.com/map/?key=...` - Longdo Map isn't published as an npm
-package for React). Get a free key at https://map.longdo.com/console. If you
-skip this, the site still runs fine; the map area just shows a "Map
-unavailable" placeholder instead. The **Get directions** button underneath
-the map (Section 10 has no endpoint for this - it's entirely client-side)
-works regardless of whether this key is set, since it just opens a Google
-Maps directions link using the hotel's `latitude`/`longitude` as the
-destination and, optionally, the guest's typed address or browser geolocation
-("Use my location") as the origin; when geolocation is used, the route is
-also drawn on the embedded Longdo map itself via its built-in `Route` module.
+คีย์ Longdo Map ใช้สำหรับแสดงแผนที่ขนาดเล็กและวิดเจ็ตแสดงเส้นทางในหน้า Hotel Detail ซึ่งอยู่ในคอมโพเนนต์ `components/HotelMap.tsx`
 
-Run it:
+ระบบโหลดแผนที่ผ่านแท็ก `<script>` โดยตรงจาก
 
-```bash
+`https://api.longdo.com/map/?key=...`
+
+เนื่องจาก Longdo Map ไม่มีการเผยแพร่เป็นแพ็กเกจ npm สำหรับ React
+
+คุณสามารถรับคีย์ฟรีได้ที่ [https://map.longdo.com/console](https://map.longdo.com/console?utm_source=chatgpt.com)
+
+หากไม่กำหนดคีย์ เว็บไซต์ยังทำงานได้ตามปกติ แต่บริเวณแผนที่จะแสดงข้อความ Placeholder ว่า `"Map unavailable"` แทน
+
+ปุ่ม Get directions ที่อยู่ใต้แผนที่ไม่จำเป็นต้องใช้ API Endpoint เพราะทำงานทั้งหมดบน Client โดยจะเปิดลิงก์เส้นทางของ Google Maps ซึ่งใช้พิกัด `latitude`/`longitude` ของโรงแรมเป็นจุดหมายปลายทาง และสามารถเลือกจุดเริ่มต้นได้จากที่อยู่ที่ผู้เข้าพักพิมพ์เอง หรือจากตำแหน่งของเบราว์เซอร์ผ่านตัวเลือก `"Use my location"`
+
+เมื่อใช้ตำแหน่งปัจจุบัน ระบบจะแสดงเส้นทางบนแผนที่ Longdo ที่ฝังอยู่ในหน้าเว็บด้วย โดยใช้โมดูล `Route` ที่มีอยู่ในตัว
+
+เริ่มต้น Frontend ด้วยคำสั่ง
+
+```
 npm run dev
 ```
 
-The site is now live at `http://localhost:3000`.
+เว็บไซต์จะพร้อมใช้งานที่
 
-## 9. Environment Variables
+`http://localhost:3000`
 
-| File                                   | Variable                    | Purpose                    |
-|-----------------------------------------|------------------------------|-----------------------------|
-| `backend/.../application.properties`    | `spring.datasource.url`      | MySQL JDBC URL              |
-| `backend/.../application.properties`    | `spring.datasource.username` | MySQL user                  |
-| `backend/.../application.properties`    | `spring.datasource.password` | MySQL password (do not commit real value) |
-| env var / `application.properties`      | `JWT_SECRET` (`jwt.secret`)   | HS256 signing key for JWTs, at least 32 random bytes (`openssl rand -base64 48`). **Required for any real deployment**; if empty a random key is generated per start |
-| env var / `application.properties`      | `APP_SEED_DEMO_ACCOUNTS`      | `true` (default) seeds the demo guest/owner accounts listed under Test Accounts; set `false` in production |
-| env var / `application.properties`      | `APP_SEED_ADMIN_PASSWORD`     | Password for the seeded admin account (falls back to the demo password in Test Accounts when empty - always set it in production) |
-| env var / `application.properties`      | `APP_SEED_GUEST_PASSWORD`, `APP_SEED_OWNER_PASSWORD` | Optional overrides for the demo guest / hotel-owner passwords |
-| env var / `application.properties`      | `SPRING_JPA_SHOW_SQL`         | `true` to print SQL while debugging (default `false`) |
-| `backend/.../application.properties`    | `jwt.expiration-ms`           | Token lifetime in milliseconds (default 24h) |
-| `backend/.../application.properties`    | `app.cors.allowed-origins`    | Comma-separated frontend origins allowed to call the API (see Section 12 for cloud deployment) |
-| `frontend/.env.local`                   | `NEXT_PUBLIC_API_URL`        | Base URL the frontend calls |
-| `frontend/.env.local`                   | `NEXT_PUBLIC_LONGDO_MAP_KEY` | Longdo Map API key, for the Hotel Detail page map + directions widget (see Section 8) |
+## 9. ตัวแปรสภาพแวดล้อม (Environment Variables)
 
-## 10. API Documentation
+ตารางต่อไปนี้แสดงไฟล์ที่ใช้กำหนดค่า ตัวแปร และวัตถุประสงค์ของแต่ละตัวแปร
 
-Base URL: `http://localhost:8080/api`
+| ไฟล์                                            | ตัวแปร                                               | วัตถุประสงค์                                                                                                                                                                                                       |
+| ----------------------------------------------- | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `backend/.../application.properties`            | `spring.datasource.url`                              | URL สำหรับเชื่อมต่อฐานข้อมูลผ่าน JDBC ของ MySQL                                                                                                                                                                    |
+| `backend/.../application.properties`            | `spring.datasource.username`                         | ชื่อผู้ใช้ฐานข้อมูล MySQL                                                                                                                                                                                          |
+| `backend/.../application.properties`            | `spring.datasource.password`                         | รหัสผ่านฐานข้อมูล MySQL ห้าม Commit ค่าจริงลง Repository                                                                                                                                                           |
+| Environment Variable / `application.properties` | `JWT_SECRET` (`jwt.secret`)                          | คีย์สำหรับลงลายเซ็น JWT แบบ HS256 ต้องมีข้อมูลสุ่มอย่างน้อย 32 ไบต์ ตัวอย่างการสร้างคือ `openssl rand -base64 48` จำเป็นสำหรับการ Deploy ใช้งานจริงทุกกรณี หากค่าว่าง ระบบจะสร้างคีย์สุ่มใหม่ทุกครั้งที่เริ่มทำงาน |
+| Environment Variable / `application.properties` | `APP_SEED_DEMO_ACCOUNTS`                             | ค่าเริ่มต้นคือ `true` ซึ่งจะสร้างบัญชี Guest และ Owner สำหรับสาธิตตามที่ระบุไว้ในหัวข้อ Test Accounts ควรตั้งเป็น `false` ใน Production                                                                            |
+| Environment Variable / `application.properties` | `APP_SEED_ADMIN_PASSWORD`                            | รหัสผ่านสำหรับบัญชี Admin ที่สร้างจากระบบเริ่มต้น หากเว้นว่าง ระบบจะใช้รหัสผ่านสาธิตจากหัวข้อ Test Accounts ควรกำหนดค่านี้เสมอใน Production                                                                        |
+| Environment Variable / `application.properties` | `APP_SEED_GUEST_PASSWORD`, `APP_SEED_OWNER_PASSWORD` | ใช้แทนที่รหัสผ่านสำหรับบัญชี Guest และ Hotel Owner สำหรับสาธิตได้ โดยเป็นตัวเลือกเสริม                                                                                                                             |
+| Environment Variable / `application.properties` | `SPRING_JPA_SHOW_SQL`                                | ตั้งเป็น `true` เพื่อแสดงคำสั่ง SQL ขณะดีบัก ค่าเริ่มต้นคือ `false`                                                                                                                                                |
+| `backend/.../application.properties`            | `jwt.expiration-ms`                                  | อายุการใช้งานของโทเคน หน่วยเป็นมิลลิวินาที ค่าเริ่มต้น 24 ชั่วโมง                                                                                                                                                  |
+| `backend/.../application.properties`            | `app.cors.allowed-origins`                           | รายการ Origin ของ Frontend ที่อนุญาตให้เรียก API โดยคั่นแต่ละรายการด้วยเครื่องหมายจุลภาค ดูหัวข้อ 12 สำหรับการ Deploy บน Cloud                                                                                     |
+| `frontend/.env.local`                           | `NEXT_PUBLIC_API_URL`                                | URL หลักของ API ที่ Frontend ใช้เรียก                                                                                                                                                                              |
+| `frontend/.env.local`                           | `NEXT_PUBLIC_LONGDO_MAP_KEY`                         | API Key ของ Longdo Map สำหรับแผนที่และวิดเจ็ตแสดงเส้นทางในหน้า Hotel Detail ดูหัวข้อ 8                                                                                                                             |
 
-Unless noted otherwise, protected endpoints expect `Authorization: Bearer {token}`.
-See [Section 5](#5-authentication--authorization) for the full access matrix.
+## 10. เอกสารอ้างอิง API (API Documentation)
 
-### Auth
-| Method | Path | Access | Description |
-|---|---|---|---|
-| POST | `/auth/register` | Public | Create a GUEST account + linked Guest profile, returns a JWT |
-| POST | `/auth/login` | Public | Returns a JWT for a valid email/password |
-| GET | `/auth/me` | Authenticated | Current user's profile (from the token) |
+URL หลักของ API คือ
 
-### Hotels
-| Method | Path | Access | Description |
-|---|---|---|---|
-| GET | `/hotels` | Public | List all hotels |
-| GET | `/hotels/{id}` | Public | Get one hotel |
-| POST | `/hotels` | ADMIN | Create a hotel |
-| PUT | `/hotels/{id}` | ADMIN | Update a hotel |
-| DELETE | `/hotels/{id}` | ADMIN | Delete a hotel |
+`http://localhost:8080/api`
 
-### Rooms
-| Method | Path | Access | Description |
-|---|---|---|---|
-| GET | `/rooms` | Public | List all rooms (`?hotelId=` to filter) |
-| GET | `/rooms/available` | Public | List rooms with status `AVAILABLE` |
-| GET | `/rooms/{id}` | Public | Get one room (includes `amenities[]`) |
-| POST | `/rooms` | ADMIN | Create a room (optionally with `amenities[]`) |
-| PUT | `/rooms/{id}` | ADMIN | Update a room (sending `amenities[]` replaces the full list) |
-| PATCH | `/rooms/{id}/status?status=` | ADMIN | Change room status |
-| DELETE | `/rooms/{id}` | ADMIN | Delete a room |
+หากไม่ได้ระบุเป็นอย่างอื่น Endpoint ที่ต้องมีการยืนยันตัวตนจะต้องส่งส่วนหัวดังนี้
 
-### Guests
-| Method | Path | Access | Description |
-|---|---|---|---|
-| GET | `/guests` | ADMIN | List all guests |
-| GET | `/guests/{id}` | ADMIN | Get one guest |
-| POST | `/guests` | ADMIN | Create a guest (front-desk / walk-in) |
-| PUT | `/guests/{id}` | ADMIN | Update a guest |
-| DELETE | `/guests/{id}` | ADMIN | Delete a guest |
+```
+Authorization: Bearer {token}
+```
 
-Regular users create their Guest profile automatically via `POST /auth/register` instead.
+ดูตารางสิทธิ์การเข้าถึงทั้งหมดได้ในหัวข้อ 5: การยืนยันตัวตนและการกำหนดสิทธิ์
 
-### Reservations
-| Method | Path | Access | Description |
-|---|---|---|---|
-| GET | `/reservations` | ADMIN | List all reservations (`?guestId=` to filter) |
-| GET | `/reservations/me` | Authenticated | Reservations for the logged-in user's own Guest profile |
-| GET | `/reservations/{id}` | Authenticated (owner or ADMIN) | Get one reservation |
-| GET | `/reservations/room/{roomId}/upcoming` | Public | Upcoming (today or later, non-cancelled) reservations for a room - powers the Advance Booking widget and Availability Calendar |
-| POST | `/reservations` | Authenticated | Create a reservation (GUEST can only book for themselves; runs all validation rules) |
-| PUT | `/reservations/{id}` | ADMIN | Update a reservation |
-| POST | `/reservations/{id}/cancel` | Authenticated (owner or ADMIN) | Cancel and free the room |
-| POST | `/reservations/{id}/check-in` | ADMIN | Mark as checked in |
-| POST | `/reservations/{id}/check-out` | ADMIN | Mark as checked out and free the room |
-| DELETE | `/reservations/{id}` | ADMIN | Delete a reservation |
+### Auth — การยืนยันตัวตน
 
-### Payments
-| Method | Path | Access | Description |
-|---|---|---|---|
-| GET | `/payments` | ADMIN | List all payments |
-| GET | `/payments/{id}` | Authenticated (owner or ADMIN) | Get one payment |
-| POST | `/payments` | Authenticated (owner or ADMIN) | Pay a reservation (moves it to `CONFIRMED`) |
-| PUT | `/payments/{id}` | ADMIN | Update a payment (e.g. refund) |
+| Method | Path             | สิทธิ์        | คำอธิบาย                                                                  |
+| ------ | ---------------- | ------------- | ------------------------------------------------------------------------- |
+| POST   | `/auth/register` | Public        | สร้างบัญชี `GUEST` พร้อมโปรไฟล์ `Guest` ที่เชื่อมโยงกัน และส่ง JWT กลับมา |
+| POST   | `/auth/login`    | Public        | ส่ง JWT กลับมาเมื่ออีเมลและรหัสผ่านถูกต้อง                                |
+| GET    | `/auth/me`       | Authenticated | ดึงข้อมูลโปรไฟล์ของผู้ใช้ปัจจุบันจากโทเคน                                 |
 
-### Payouts (platform → hotel, net of commission)
-The platform acts as a payment intermediary: it collects the guest's full
-payment, then owes the hotel that amount minus its commission. A `Payout` is
-created automatically the moment a `Payment` succeeds (see
-`PaymentService.createPayment` → `PayoutService.createForPayment`), sitting
-`PENDING` until an ADMIN records the actual transfer (`PAID`). If the
-underlying payment is later refunded, a still-`PENDING` payout is
-auto-`CANCELLED` (a `PAID` one has already left the platform, so reversing
-it is a manual, out-of-band process). Every payout snapshots the hotel's
-commission rate **at the moment of payment**, so a later rate change never
-rewrites a historical payout.
+### Hotels — โรงแรม
 
-A hotel's commission rate defaults to 15% and is finance-sensitive - it's
-never included in the public `GET /api/hotels/**` response, only via the
-dedicated endpoints below, and only an ADMIN can change it.
+| Method | Path           | สิทธิ์ | คำอธิบาย                 |
+| ------ | -------------- | ------ | ------------------------ |
+| GET    | `/hotels`      | Public | แสดงรายการโรงแรมทั้งหมด  |
+| GET    | `/hotels/{id}` | Public | ดึงข้อมูลโรงแรมหนึ่งแห่ง |
+| POST   | `/hotels`      | ADMIN  | สร้างโรงแรม              |
+| PUT    | `/hotels/{id}` | ADMIN  | อัปเดตข้อมูลโรงแรม       |
+| DELETE | `/hotels/{id}` | ADMIN  | ลบโรงแรม                 |
 
-| Method | Path | Access | Description |
-|---|---|---|---|
-| GET | `/payouts` | ADMIN | Every payout, platform-wide, newest first - optionally narrowed with `?status=PENDING\|PAID\|CANCELLED` |
-| GET | `/payouts/summary` | ADMIN | Platform-wide totals: `{ totalGross, totalCommission, totalNetPending, totalNetPaid, pendingCount, paidCount }` |
-| GET | `/payouts/hotel/{hotelId}` | ADMIN, or that hotel's HOTEL_OWNER/HOTEL_STAFF with `VIEW_FINANCE` | One hotel's payout history |
-| GET | `/payouts/hotel/{hotelId}/summary` | Same as above | Same totals shape, scoped to one hotel |
-| POST | `/payouts/{id}/pay` | ADMIN | Records that the platform transferred a pending payout's net amount - body: `{ payoutMethod: "BANK_TRANSFER"\|"PROMPTPAY"\|"CHEQUE"\|"OTHER", transactionReference }` |
-| GET | `/hotels/{id}/commission-rate` | ADMIN, or that hotel's HOTEL_OWNER/HOTEL_STAFF with `VIEW_FINANCE` | `{ commissionRate }` for that hotel |
-| PATCH | `/hotels/{id}/commission-rate` | ADMIN | Change a hotel's commission rate - a hotel can never set its own cut |
+### Rooms — ห้องพัก
 
-### Reviews
-A guest can leave one star rating (1-5) + written comment per stay, but only
-once that reservation's status is `CHECKED_OUT` - this is what makes every
-review a **verified stay**. `POST`/`PUT` accept `{ rating, comment }` (plus
-`reservationId` on create); every response uses a privacy-safe projection
-(`guestName` is a display name like `"Somchai J."`, never the reviewer's
-email/phone/address) since the hotel-listing endpoints are public.
+| Method | Path                         | สิทธิ์ | คำอธิบาย                                                                                        |
+| ------ | ---------------------------- | ------ | ----------------------------------------------------------------------------------------------- |
+| GET    | `/rooms`                     | Public | แสดงรายการห้องพักทั้งหมด สามารถกรองตามโรงแรมได้ด้วย `?hotelId=`                                 |
+| GET    | `/rooms/available`           | Public | แสดงห้องพักที่มีสถานะ `AVAILABLE`                                                               |
+| GET    | `/rooms/{id}`                | Public | ดึงข้อมูลห้องพักหนึ่งห้อง รวมถึง `amenities[]`                                                  |
+| POST   | `/rooms`                     | ADMIN  | สร้างห้องพัก โดยสามารถส่ง `amenities[]` มาพร้อมกันได้                                           |
+| PUT    | `/rooms/{id}`                | ADMIN  | อัปเดตข้อมูลห้องพัก หากส่ง `amenities[]` มาด้วย ระบบจะแทนที่รายการสิ่งอำนวยความสะดวกเดิมทั้งหมด |
+| PATCH  | `/rooms/{id}/status?status=` | ADMIN  | เปลี่ยนสถานะห้องพัก                                                                             |
+| DELETE | `/rooms/{id}`                | ADMIN  | ลบห้องพัก                                                                                       |
 
-| Method | Path | Access | Description |
-|---|---|---|---|
-| GET | `/reviews/hotel/{hotelId}` | Public | All reviews for a hotel, newest first |
-| GET | `/reviews/hotel/{hotelId}/summary` | Public | `{ averageRating, totalReviews }` for a hotel |
-| GET | `/reviews/me` | Authenticated | The logged-in guest's own reviews |
-| GET | `/reviews/reviewable` | Authenticated | The logged-in guest's `CHECKED_OUT` stays that don't have a review yet - powers the "Write a review" prompt |
-| POST | `/reviews` | Authenticated (GUEST) | Create a review for one of your own checked-out stays (400 if it's not checked out yet or already reviewed) |
-| PUT | `/reviews/{id}` | Authenticated (owner) | Edit your own review's rating/comment |
-| DELETE | `/reviews/{id}` | Authenticated (owner, or that hotel's ADMIN/HOTEL_OWNER/HOTEL_STAFF with `MANAGE_HOTEL_INFO`) | Delete a review - by the reviewer themselves, or as moderation |
+### Guests — ผู้เข้าพัก
 
-## 11. How to Run (end to end)
+| Method | Path           | สิทธิ์ | คำอธิบาย                                                                    |
+| ------ | -------------- | ------ | --------------------------------------------------------------------------- |
+| GET    | `/guests`      | ADMIN  | แสดงรายชื่อผู้เข้าพักทั้งหมด                                                |
+| GET    | `/guests/{id}` | ADMIN  | ดึงข้อมูลผู้เข้าพักหนึ่งคน                                                  |
+| POST   | `/guests`      | ADMIN  | สร้างข้อมูลผู้เข้าพัก เช่น สำหรับผู้ที่มาติดต่อจองห้องพักโดยตรงหรือ Walk-in |
+| PUT    | `/guests/{id}` | ADMIN  | อัปเดตข้อมูลผู้เข้าพัก                                                      |
+| DELETE | `/guests/{id}` | ADMIN  | ลบข้อมูลผู้เข้าพัก                                                          |
 
-1. Start MySQL and create the database (Section 6).
-2. `cd backend && mvn spring-boot:run` — wait for `Started HotelReservationApplication`.
-   On first startup, `DataInitializer` automatically creates the admin and
-   test guest logins (see Test Accounts below) — no manual SQL needed for auth.
-3. `cd frontend && npm install && npm run dev`.
-4. Open `http://localhost:3000`.
-5. Click **Login** (or **Create account** to sign up as a new guest).
-6. Browse hotels → open a hotel → view a room → **New Booking** → fill in
-   stay details → **Continue to Payment** → **Pay Now**.
-7. Go to `/reservations` to see your booking history, or log in as
-   `admin@hotel.com` and visit `/admin` to manage everything.
+ผู้ใช้ทั่วไปจะได้รับการสร้างโปรไฟล์ `Guest` โดยอัตโนมัติผ่าน `POST /auth/register` แทนการสร้างด้วยตนเอง
 
-## 12. Deploying to the Cloud
+### Reservations — การจอง
 
-This is three separate deployments (database, backend, frontend), each on
-its own free/low-cost tier. None of them require touching the code beyond
-the CORS fix already built in (Section 9 / `app.cors.allowed-origins`).
+| Method | Path                                   | สิทธิ์                                  | คำอธิบาย                                                                                                                                          |
+| ------ | -------------------------------------- | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GET    | `/reservations`                        | ADMIN                                   | แสดงรายการจองทั้งหมด สามารถกรองด้วย `?guestId=`                                                                                                   |
+| GET    | `/reservations/me`                     | Authenticated                           | แสดงการจองของโปรไฟล์ `Guest` ที่เป็นของผู้ใช้ซึ่งเข้าสู่ระบบอยู่                                                                                  |
+| GET    | `/reservations/{id}`                   | Authenticated (เจ้าของรายการหรือ ADMIN) | ดึงข้อมูลการจองหนึ่งรายการ                                                                                                                        |
+| GET    | `/reservations/room/{roomId}/upcoming` | Public                                  | แสดงการจองที่กำลังจะมาถึงของห้องนั้น โดยนับตั้งแต่วันนี้เป็นต้นไปและไม่รวมรายการที่ยกเลิก ใช้กับวิดเจ็ต Advance Booking และ Availability Calendar |
+| POST   | `/reservations`                        | Authenticated                           | สร้างการจอง โดย `GUEST` จองได้เฉพาะให้ตนเอง และระบบจะตรวจสอบกฎทั้งหมดก่อนบันทึก                                                                   |
+| PUT    | `/reservations/{id}`                   | ADMIN                                   | อัปเดตการจอง                                                                                                                                      |
+| POST   | `/reservations/{id}/cancel`            | Authenticated (เจ้าของรายการหรือ ADMIN) | ยกเลิกการจองและคืนสถานะห้องให้สามารถนำกลับมาใช้งานได้                                                                                             |
+| POST   | `/reservations/{id}/check-in`          | ADMIN                                   | กำหนดสถานะเป็นเช็กอินแล้ว                                                                                                                         |
+| POST   | `/reservations/{id}/check-out`         | ADMIN                                   | กำหนดสถานะเป็นเช็กเอาต์แล้วและคืนสถานะห้องให้สามารถใช้งานได้                                                                                      |
+| DELETE | `/reservations/{id}`                   | ADMIN                                   | ลบรายการจอง                                                                                                                                       |
 
-### Step 1 — Database (MySQL)
+### Payments — การชำระเงิน
 
-Any managed MySQL works. Easy free-tier options: **Railway** (MySQL plugin),
-**Aiven**, or **PlanetScale**. Create the database, then run
-`database/schema.sql` against it (most providers give you a connection
-string you can pass to `mysql -u ... -p ... -h ... < database/schema.sql`,
-or use their web SQL console). Note the host, port, database name, username,
-and password — the backend needs these next.
+| Method | Path             | สิทธิ์                                  | คำอธิบาย                                                   |
+| ------ | ---------------- | --------------------------------------- | ---------------------------------------------------------- |
+| GET    | `/payments`      | ADMIN                                   | แสดงรายการชำระเงินทั้งหมด                                  |
+| GET    | `/payments/{id}` | Authenticated (เจ้าของรายการหรือ ADMIN) | ดึงข้อมูลการชำระเงินหนึ่งรายการ                            |
+| POST   | `/payments`      | Authenticated (เจ้าของรายการหรือ ADMIN) | ชำระเงินสำหรับการจอง และเปลี่ยนสถานะการจองเป็น `CONFIRMED` |
+| PUT    | `/payments/{id}` | ADMIN                                   | อัปเดตข้อมูลการชำระเงิน เช่น การคืนเงิน                    |
 
-### Step 2 — Backend (Spring Boot)
+### Payouts — การจ่ายเงินจากแพลตฟอร์มไปยังโรงแรมหลังหักค่าคอมมิชชัน
 
-Deploy the `backend/` folder to a Java host — **Railway** or **Render**
-both auto-detect a Maven project and run `mvn spring-boot:run` for you with
-zero config files needed. Set these environment variables on the platform
-(Spring Boot reads env vars automatically — no code changes needed):
+แพลตฟอร์มทำหน้าที่เป็นตัวกลางในการรับชำระเงิน กล่าวคือ แพลตฟอร์มจะรับเงินเต็มจำนวนจากผู้เข้าพัก จากนั้นจะมีภาระต้องจ่ายเงินให้โรงแรมเป็นจำนวนเงินหลังหักค่าคอมมิชชันของแพลตฟอร์มแล้ว
 
-| Env var | Value |
-|---|---|
-| `SPRING_DATASOURCE_URL` | `jdbc:mysql://<db-host>:<db-port>/hotel_reservation?useSSL=false&serverTimezone=UTC` |
-| `SPRING_DATASOURCE_USERNAME` | your DB username |
-| `SPRING_DATASOURCE_PASSWORD` | your DB password |
-| `JWT_SECRET` | a long random string, 32+ bytes (e.g. `openssl rand -base64 48`) - never reuse a value from the repo |
-| `APP_SEED_DEMO_ACCOUNTS` | `false` - don't create the publicly documented demo logins in production |
-| `APP_SEED_ADMIN_PASSWORD` | a strong password for the first admin account |
-| `APP_CORS_ALLOWED_ORIGINS` | your frontend's URL once deployed in Step 3, e.g. `https://your-app.vercel.app` (you can come back and set this after Step 3) |
+ระบบจะสร้างระเบียน `Payout` โดยอัตโนมัติทันทีที่ `Payment` สำเร็จ ซึ่งสามารถติดตามขั้นตอนนี้ได้จาก
 
-After it deploys, note the backend's public URL (e.g.
-`https://your-backend.up.railway.app`) — the frontend needs it next.
+`PaymentService.createPayment` → `PayoutService.createForPayment`
 
-### Step 3 — Frontend (Next.js)
+เมื่อสร้างแล้ว `Payout` จะมีสถานะ `PENDING` จนกว่า `ADMIN` จะบันทึกว่ามีการโอนเงินจริงแล้ว โดยเปลี่ยนเป็นสถานะ `PAID`
 
-**Vercel** is the simplest option for Next.js — connect your GitHub repo,
-set the **root directory** to `frontend/`, and set this environment variable:
+หากมีการคืนเงินสำหรับรายการชำระเงินที่เกี่ยวข้องในภายหลัง
 
-| Env var | Value |
-|---|---|
-| `NEXT_PUBLIC_API_URL` | `https://your-backend.up.railway.app/api` (the backend URL from Step 2, plus `/api`) |
-| `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` | Your Google Maps JavaScript API key (see Section 8) - optional, the site works without it |
+- หาก Payout ยังมีสถานะ `PENDING` ระบบจะเปลี่ยนสถานะเป็น `CANCELLED` โดยอัตโนมัติ
+- หาก Payout มีสถานะ `PAID` เงินได้ออกจากแพลตฟอร์มไปแล้ว การย้อนรายการจึงต้องดำเนินการด้วยตนเองนอกกระบวนการอัตโนมัติ
 
-Deploy. Then go back to Step 2's backend env vars and set
-`APP_CORS_ALLOWED_ORIGINS` to your new Vercel URL (e.g.
-`https://your-app.vercel.app`) so the browser is actually allowed to call
-the API — without this step you'll see CORS errors in the browser console.
+Payout ทุกครั้งจะบันทึกอัตราค่าคอมมิชชันของโรงแรมไว้ ณ เวลาที่มีการชำระเงิน ดังนั้นการเปลี่ยนอัตราค่าคอมมิชชันในภายหลังจะไม่เปลี่ยนแปลงข้อมูล Payout ในอดีต
 
-### Notes
+อัตราค่าคอมมิชชันเริ่มต้นของโรงแรมคือ 15% ข้อมูลนี้มีความอ่อนไหวด้านการเงิน จึงจะไม่ถูกรวมอยู่ในการตอบกลับสาธารณะของ `GET /api/hotels/**` แต่จะเข้าถึงได้ผ่าน Endpoint เฉพาะด้านล่าง และมีเพียง `ADMIN` เท่านั้นที่สามารถเปลี่ยนแปลงอัตรานี้ได้
 
-- The three services can be swapped for others (e.g. AWS, DigitalOcean,
-  Fly.io) — the only requirement is that the backend can reach the
-  database, and the frontend knows the backend's public URL.
-- `DataInitializer` seeds `admin@hotel.com` / `guest1-3@test.com` on first
-  backend startup against whatever database it's pointed at, so the test
-  accounts work in the cloud the same way they do locally.
-- Multiple frontend origins (e.g. a preview URL and a production URL) can
-  be set at once: `APP_CORS_ALLOWED_ORIGINS=https://prod.vercel.app,https://preview.vercel.app`.
+| Method | Path                               | สิทธิ์                                                                     | คำอธิบาย                                                                                                                                                                            |
+| ------ | ---------------------------------- | -------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GET    | `/payouts`                         | ADMIN                                                                      | แสดง Payout ทั้งหมดของแพลตฟอร์ม เรียงจากรายการใหม่ไปเก่า สามารถกรองด้วย `?status=PENDING\\|PAID\\|CANCELLED`                                                                        |
+| GET    | `/payouts/summary`                 | ADMIN                                                                      | แสดงยอดรวมทั้งแพลตฟอร์ม ได้แก่ `{ totalGross, totalCommission, totalNetPending, totalNetPaid, pendingCount, paidCount }`                                                            |
+| GET    | `/payouts/hotel/{hotelId}`         | ADMIN หรือ HOTEL_OWNER/HOTEL_STAFF ของโรงแรมนั้นที่มีสิทธิ์ `VIEW_FINANCE` | แสดงประวัติ Payout ของโรงแรมหนึ่งแห่ง                                                                                                                                               |
+| GET    | `/payouts/hotel/{hotelId}/summary` | สิทธิ์เดียวกับ Endpoint ก่อนหน้า                                           | แสดงยอดรวมในรูปแบบเดียวกัน โดยจำกัดเฉพาะโรงแรมนั้น                                                                                                                                  |
+| POST   | `/payouts/{id}/pay`                | ADMIN                                                                      | บันทึกว่าแพลตฟอร์มได้โอนเงินสุทธิของ Payout ที่ยังเป็น `PENDING` แล้ว โดยส่ง Body เช่น `{ payoutMethod: "BANK_TRANSFER"\\|"PROMPTPAY"\\|"CHEQUE"\\|"OTHER", transactionReference }` |
+| GET    | `/hotels/{id}/commission-rate`     | ADMIN หรือ HOTEL_OWNER/HOTEL_STAFF ของโรงแรมนั้นที่มีสิทธิ์ `VIEW_FINANCE` | ส่งคืน `{ commissionRate }` สำหรับโรงแรมนั้น                                                                                                                                        |
+| PATCH  | `/hotels/{id}/commission-rate`     | ADMIN                                                                      | เปลี่ยนอัตราค่าคอมมิชชันของโรงแรม โดยโรงแรมไม่สามารถกำหนดส่วนแบ่งค่าคอมมิชชันของตนเองได้                                                                                            |
 
-## 13. How to Add Images
+### Reviews — รีวิว
 
-Every image slot uses the `ImagePlaceholder` component, which now renders a
-**real photo automatically** if an `imageUrl` is set and the file loads
-successfully — otherwise it falls back to the dashed-border placeholder (so
-nothing breaks if a file is missing yet). To add real photos:
+ผู้เข้าพักสามารถให้คะแนนตั้งแต่ 1–5 ดาว พร้อมเขียนความคิดเห็นสำหรับการเข้าพักแต่ละครั้งได้เพียงหนึ่งครั้ง และจะทำได้ก็ต่อเมื่อสถานะการจองเป็น `CHECKED_OUT` แล้วเท่านั้น
 
-**Uploading photos from the admin screen (no file copying needed)**: log in
-as ADMIN / HOTEL_OWNER (or HOTEL_STAFF with `MANAGE_HOTEL_INFO` / `MANAGE_ROOMS`),
-open `/admin/hotels` (or `/admin/rooms`), edit the item and use the
-**Upload image** button next to the main image or each gallery photo
-(Gallery Images -> Add Image), then press Save. Files are checked by their
-real content (JPG/PNG/GIF, max 8 MB), re-encoded by the server (EXIF/GPS
-data is removed, large photos are scaled to 2400px; GIFs become a static PNG)
-and stored on the backend under
-`backend/uploads/images/` (override with `APP_UPLOAD_DIR`; set
-`APP_UPLOAD_PUBLIC_BASE_URL` when the API is behind a proxy) and served at
-`/uploads/images/**`. Back this folder up / mount it on a persistent volume
-in production.
+เงื่อนไขนี้ทำให้รีวิวทุกชิ้นเป็น รีวิวจากการเข้าพักที่ได้รับการยืนยันแล้ว (Verified Stay)
 
-**Using Supabase (PostgreSQL) instead of MySQL**: open Supabase ->
-SQL Editor, paste `database/schema-supabase.sql` and run it (it drops and
-recreates every table, enables Row Level Security so the public Supabase
-API cannot read your data, and seeds 20 real hotels with real coordinates).
-Then start the backend with the `supabase` profile and the
-`SUPABASE_DB_URL` / `SUPABASE_DB_USER` / `SUPABASE_DB_PASSWORD` environment
-variables - see `backend/src/main/resources/application-supabase.properties`.
-`schema-supabase.sql` refuses to run if the tables already exist (it would
-`DROP` them); to deliberately wipe a development database, change
-`confirm_reset` to `'yes'` in the SAFETY GUARD at the top of the file.
-Connect with `sslmode=verify-full` and the Supabase CA certificate.
+คำขอ `POST` และ `PUT` ยอมรับข้อมูล `{ rating, comment }` โดยตอนสร้างรีวิวจะต้องส่ง `reservationId` เพิ่มเติมด้วย
 
-**Hotels are pre-wired**: `database/schema.sql` already sets `image_url` for
-all 20 seeded hotels to a slug of their name (e.g.
-`/images/hotels/mandarin-oriental-bangkok.jpg`). Just drop a correctly-named
-file into `frontend/public/images/hotels/` and it appears automatically —
-no need to touch `/admin/hotels` for the seeded hotels. Run the query below
-to get the exact expected filename for every hotel:
+การตอบกลับทุกครั้งใช้รูปแบบข้อมูลที่คำนึงถึงความเป็นส่วนตัว โดย `guestName` จะเป็นชื่อที่ใช้แสดงผล เช่น `"Somchai J."` ไม่ใช่อีเมล หมายเลขโทรศัพท์ หรือที่อยู่ของผู้รีวิว เนื่องจาก Endpoint สำหรับแสดงรายการโรงแรมเป็นข้อมูลสาธารณะ
 
-```sql
+| Method | Path                               | สิทธิ์                                                                                                       | คำอธิบาย                                                                                                            |
+| ------ | ---------------------------------- | ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------- |
+| GET    | `/reviews/hotel/{hotelId}`         | Public                                                                                                       | แสดงรีวิวทั้งหมดของโรงแรม เรียงจากรายการใหม่ไปเก่า                                                                  |
+| GET    | `/reviews/hotel/{hotelId}/summary` | Public                                                                                                       | ส่งคืน `{ averageRating, totalReviews }` ซึ่งเป็นคะแนนเฉลี่ยและจำนวนรีวิวของโรงแรม                                  |
+| GET    | `/reviews/me`                      | Authenticated                                                                                                | แสดงรีวิวของผู้เข้าพักที่เข้าสู่ระบบอยู่                                                                            |
+| GET    | `/reviews/reviewable`              | Authenticated                                                                                                | แสดงการเข้าพักที่มีสถานะ `CHECKED_OUT` ของผู้ใช้ปัจจุบัน ซึ่งยังไม่มีรีวิว ใช้สำหรับแสดงข้อความเชิญชวนให้เขียนรีวิว |
+| POST   | `/reviews`                         | Authenticated (`GUEST`)                                                                                      | สร้างรีวิวสำหรับการเข้าพักที่เช็กเอาต์แล้วและเป็นของตนเอง หากยังไม่เช็กเอาต์หรือมีรีวิวแล้ว จะส่ง `400` กลับมา      |
+| PUT    | `/reviews/{id}`                    | Authenticated (เจ้าของรีวิว)                                                                                 | แก้ไขคะแนนหรือความคิดเห็นของรีวิวตนเอง                                                                              |
+| DELETE | `/reviews/{id}`                    | Authenticated (เจ้าของรีวิว หรือ ADMIN/HOTEL_OWNER/HOTEL_STAFF ของโรงแรมนั้นที่มีสิทธิ์ `MANAGE_HOTEL_INFO`) | ลบรีวิว โดยเจ้าของรีวิวสามารถลบของตนเองได้ หรือผู้มีสิทธิ์สามารถลบเพื่อดูแลและควบคุมเนื้อหาได้                      |
+
+## 11. วิธีเรียกใช้งานระบบตั้งแต่ต้นจนจบ (How to Run — End to End)
+
+1. เปิดใช้งาน MySQL และสร้างฐานข้อมูลตามหัวข้อ 6
+2. เรียกใช้คำสั่ง `cd backend && mvn spring-boot:run` แล้วรอจนเห็นข้อความ `Started HotelReservationApplication`
+
+   ในการเริ่มทำงานครั้งแรก `DataInitializer` จะสร้างบัญชีผู้ดูแลระบบและบัญชีผู้เข้าพักสำหรับทดสอบโดยอัตโนมัติ ดูรายละเอียดในหัวข้อ Test Accounts จึงไม่จำเป็นต้องเขียน SQL เพื่อสร้างบัญชีสำหรับการยืนยันตัวตนด้วยตนเอง
+3. เรียกใช้ `cd frontend && npm install && npm run dev`
+4. เปิด `http://localhost:3000`
+5. คลิก Login เพื่อเข้าสู่ระบบ หรือคลิก Create account เพื่อสมัครบัญชีผู้เข้าพักใหม่
+6. เรียกดูโรงแรม → เปิดหน้าโรงแรม → ดูห้องพัก → คลิก New Booking → กรอกรายละเอียดการเข้าพัก → คลิก Continue to Payment → คลิก Pay Now
+7. ไปที่ `/reservations` เพื่อดูประวัติการจอง หรือเข้าสู่ระบบด้วย `admin@hotel.com` แล้วเปิด `/admin` เพื่อจัดการระบบทั้งหมด
+
+## 12. การ Deploy ระบบขึ้น Cloud (Deploying to the Cloud)
+
+ระบบนี้แบ่งออกเป็นการ Deploy สามส่วนแยกกัน ได้แก่ ฐานข้อมูล Backend และ Frontend โดยแต่ละส่วนสามารถใช้แพ็กเกจฟรีหรือแพ็กเกจราคาประหยัดได้
+
+ไม่จำเป็นต้องแก้ไขโค้ดเพิ่มเติมนอกเหนือจากการตั้งค่า CORS ที่เตรียมไว้แล้วในหัวข้อ 9 ผ่าน `app.cors.allowed-origins`
+
+### ขั้นตอนที่ 1 — ฐานข้อมูล (Database: MySQL)
+
+สามารถใช้บริการ MySQL ที่มีการจัดการให้ เช่น
+
+- Railway โดยใช้ MySQL Plugin
+- Aiven
+- PlanetScale
+
+สร้างฐานข้อมูลบนผู้ให้บริการที่เลือก แล้วเรียกใช้ `database/schema.sql` กับฐานข้อมูลนั้น ผู้ให้บริการส่วนใหญ่มักมี Connection String ที่สามารถนำไปใช้กับคำสั่ง `mysql` ได้ หรือมีหน้า Web SQL Console ให้ใช้งาน
+
+ตัวอย่างคำสั่ง
+
+```
+mysql -u ... -p ... -h ... < database/schema.sql
+```
+
+จดข้อมูล Host, Port, ชื่อฐานข้อมูล, Username และ Password ไว้ เพราะ Backend จำเป็นต้องใช้ข้อมูลเหล่านี้ในขั้นตอนถัดไป
+
+### ขั้นตอนที่ 2 — Backend (Spring Boot)
+
+นำโฟลเดอร์ `backend/` ไป Deploy บนแพลตฟอร์มที่รองรับ Java เช่น Railway หรือ Render
+
+ทั้งสองแพลตฟอร์มสามารถตรวจจับโปรเจกต์ Maven และเรียกใช้ `mvn spring-boot:run` ได้โดยอัตโนมัติ โดยไม่จำเป็นต้องสร้างไฟล์กำหนดค่าเพิ่มเติม
+
+กำหนด Environment Variables ต่อไปนี้บนแพลตฟอร์ม
+
+| Environment Variable         | ค่า                                                                                                                |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `SPRING_DATASOURCE_URL`      | `jdbc:mysql://<db-host>:<db-port>/hotel_reservation?useSSL=false&serverTimezone=UTC`                               |
+| `SPRING_DATASOURCE_USERNAME` | Username ของฐานข้อมูล                                                                                              |
+| `SPRING_DATASOURCE_PASSWORD` | Password ของฐานข้อมูล                                                                                              |
+| `JWT_SECRET`                 | สตริงสุ่มที่ยาวอย่างน้อย 32 ไบต์ เช่น `openssl rand -base64 48` ห้ามนำค่าจาก Repository มาใช้ซ้ำ                   |
+| `APP_SEED_DEMO_ACCOUNTS`     | `false` เพื่อไม่สร้างบัญชีสาธิตที่มีการเผยแพร่ข้อมูลเข้าสู่ระบบไว้ในเอกสารเมื่อใช้งานจริง                          |
+| `APP_SEED_ADMIN_PASSWORD`    | รหัสผ่านที่รัดกุมสำหรับบัญชี Admin เริ่มต้น                                                                        |
+| `APP_CORS_ALLOWED_ORIGINS`   | URL ของ Frontend หลัง Deploy ในขั้นตอนที่ 3 เช่น `https://your-app.vercel.app` โดยสามารถกลับมาตั้งค่านี้ภายหลังได้ |
+
+เมื่อ Deploy สำเร็จ ให้บันทึก URL สาธารณะของ Backend ไว้ เช่น
+
+`https://your-backend.up.railway.app`
+
+Frontend จะต้องใช้ URL นี้ในขั้นตอนต่อไป
+
+### ขั้นตอนที่ 3 — Frontend (Next.js)
+
+Vercel เป็นตัวเลือกที่ง่ายที่สุดสำหรับ Next.js
+
+เชื่อมต่อ GitHub Repository ของโปรเจกต์ ตั้งค่า Root Directory เป็น `frontend/` แล้วกำหนด Environment Variable ดังนี้
+
+| Environment Variable              | ค่า                                                                                                                  |
+| --------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `NEXT_PUBLIC_API_URL`             | `https://your-backend.up.railway.app/api` โดยใช้ URL Backend จากขั้นตอนที่ 2 และต่อท้ายด้วย `/api`                   |
+| `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` | Google Maps JavaScript API Key ของคุณ ดูรายละเอียดในหัวข้อ 8 โดยเป็นตัวเลือกเสริม เว็บไซต์ยังทำงานได้หากไม่มีคีย์นี้ |
+
+ดำเนินการ Deploy จากนั้นกลับไปยัง Environment Variables ของ Backend ในขั้นตอนที่ 2 แล้วกำหนด `APP_CORS_ALLOWED_ORIGINS` ให้เป็น URL Vercel ใหม่ของคุณ เช่น
+
+`https://your-app.vercel.app`
+
+ขั้นตอนนี้จำเป็นเพื่อให้เบราว์เซอร์สามารถเรียก API ได้ หากไม่ได้ตั้งค่า จะพบข้อผิดพลาด CORS ใน Console ของเบราว์เซอร์
+
+### หมายเหตุ (Notes)
+
+- สามารถเปลี่ยนผู้ให้บริการทั้งสามส่วนไปใช้บริการอื่นได้ เช่น AWS, DigitalOcean หรือ Fly.io เงื่อนไขสำคัญมีเพียง Backend ต้องเชื่อมต่อฐานข้อมูลได้ และ Frontend ต้องทราบ URL สาธารณะของ Backend
+- `DataInitializer` จะสร้างบัญชี `admin@hotel.com` และ `guest1-3@test.com` เมื่อ Backend เริ่มทำงานครั้งแรกกับฐานข้อมูลที่กำหนดไว้ ดังนั้นบัญชีทดสอบจึงใช้งานบน Cloud ได้เช่นเดียวกับการใช้งานในเครื่อง
+- สามารถอนุญาตให้ Frontend หลาย Origin เรียก API ได้พร้อมกัน เช่น URL Preview และ URL Production โดยตั้งค่าดังนี้
+
+```
+APP_CORS_ALLOWED_ORIGINS=https://prod.vercel.app,https://preview.vercel.app
+```
+
+## 13. วิธีเพิ่มรูปภาพ (How to Add Images)
+
+ช่องสำหรับแสดงรูปภาพทุกตำแหน่งใช้คอมโพเนนต์ `ImagePlaceholder` ซึ่งได้รับการปรับปรุงให้แสดงรูปภาพจริงโดยอัตโนมัติ หากมีการกำหนด `imageUrl` และไฟล์สามารถโหลดได้สำเร็จ หากไม่มีไฟล์หรือโหลดไม่สำเร็จ ระบบจะกลับไปแสดง Placeholder ที่มีเส้นขอบแบบเส้นประแทน เพื่อไม่ให้เกิดข้อผิดพลาดเมื่อยังไม่มีไฟล์รูปภาพ
+
+### การอัปโหลดรูปภาพจากหน้าผู้ดูแลระบบ (ไม่จำเป็นต้องคัดลอกไฟล์ด้วยตนเอง)
+
+เข้าสู่ระบบด้วยบัญชี `ADMIN` หรือ `HOTEL_OWNER` หรือบัญชี `HOTEL_STAFF` ที่ได้รับสิทธิ์ `MANAGE_HOTEL_INFO` หรือ `MANAGE_ROOMS`
+
+จากนั้นเปิดหน้า `/admin/hotels` หรือ `/admin/rooms` แล้วแก้ไขรายการที่ต้องการ
+
+ใช้ปุ่ม Upload image ซึ่งอยู่ถัดจากรูปภาพหลักหรือรูปภาพแต่ละรูปในแกลเลอรี โดยสามารถเพิ่มรูปภาพได้จากส่วน `Gallery Images -> Add Image` แล้วกด Save
+
+ระบบจะตรวจสอบไฟล์จากเนื้อหาจริงของไฟล์ โดยรองรับ JPG, PNG และ GIF ขนาดสูงสุด 8 MB จากนั้นเซิร์ฟเวอร์จะเข้ารหัสรูปภาพใหม่อีกครั้ง โดยมีการดำเนินการดังนี้
+
+- ลบข้อมูล EXIF/GPS ออกจากไฟล์
+- ปรับขนาดรูปภาพขนาดใหญ่ให้เหลือไม่เกิน 2400 พิกเซล
+- แปลง GIF ให้เป็นภาพนิ่งในรูปแบบ PNG
+
+ไฟล์จะถูกจัดเก็บไว้บน Backend ที่
+
+`backend/uploads/images/`
+
+สามารถเปลี่ยนตำแหน่งจัดเก็บได้ผ่าน `APP_UPLOAD_DIR` และหาก API อยู่หลัง Proxy ให้กำหนด `APP_UPLOAD_PUBLIC_BASE_URL` ด้วย
+
+รูปภาพจะถูกให้บริการผ่านเส้นทาง
+
+`/uploads/images/**`
+
+เมื่อใช้งาน Production ควรสำรองข้อมูลโฟลเดอร์นี้ หรือเชื่อมต่อโฟลเดอร์ดังกล่าวเข้ากับ Persistent Volume เพื่อป้องกันไฟล์สูญหายเมื่อระบบถูกรีสตาร์ตหรือ Deploy ใหม่
+
+### การใช้ Supabase (PostgreSQL) แทน MySQL
+
+เปิด Supabase แล้วไปที่ SQL Editor จากนั้นวางเนื้อหาจากไฟล์ `database/schema-supabase.sql` และเรียกใช้สคริปต์
+
+สคริปต์นี้จะดำเนินการดังต่อไปนี้
+
+- ลบและสร้างตารางทั้งหมดใหม่
+- เปิดใช้งาน Row Level Security (RLS) เพื่อป้องกันไม่ให้ Supabase Public API อ่านข้อมูลของคุณได้
+- เพิ่มข้อมูลเริ่มต้นของโรงแรมจริง 20 แห่ง พร้อมพิกัดจริง
+
+จากนั้นเริ่มต้น Backend ด้วย Profile ชื่อ `supabase` และกำหนด Environment Variables ดังต่อไปนี้
+
+- `SUPABASE_DB_URL`
+- `SUPABASE_DB_USER`
+- `SUPABASE_DB_PASSWORD`
+
+ดูรายละเอียดเพิ่มเติมในไฟล์
+
+`backend/src/main/resources/application-supabase.properties`
+
+ข้อควรระวัง: `schema-supabase.sql` จะปฏิเสธการทำงานหากมีตารางเหล่านี้อยู่แล้ว เนื่องจากสคริปต์มีคำสั่ง `DROP` ซึ่งจะลบตารางเดิม
+
+หากต้องการล้างฐานข้อมูลสำหรับการพัฒนาโดยตั้งใจ ให้เปลี่ยนค่า `confirm_reset` ในส่วน SAFETY GUARD ด้านบนของไฟล์เป็น `'yes'`
+
+การเชื่อมต่อควรใช้ `sslmode=verify-full` พร้อมใบรับรอง CA ของ Supabase
+
+### โรงแรมมีการกำหนดเส้นทางรูปภาพไว้ล่วงหน้าแล้ว
+
+ไฟล์ `database/schema.sql` กำหนดค่า `image_url` ให้โรงแรมทั้ง 20 แห่งที่เพิ่มไว้ในข้อมูลเริ่มต้นแล้ว โดยใช้ชื่อย่อหรือ Slug ที่ได้จากชื่อโรงแรม เช่น
+
+`/images/hotels/mandarin-oriental-bangkok.jpg`
+
+เพียงนำไฟล์ที่มีชื่อถูกต้องไปวางไว้ใน
+
+`frontend/public/images/hotels/`
+
+รูปภาพก็จะปรากฏขึ้นโดยอัตโนมัติ โดยไม่จำเป็นต้องเข้าไปแก้ไขผ่าน `/admin/hotels` สำหรับโรงแรมที่มีข้อมูลเริ่มต้นเหล่านี้
+
+ใช้คำสั่ง SQL ต่อไปนี้เพื่อดูชื่อไฟล์ที่คาดหวังสำหรับโรงแรมแต่ละแห่ง
+
+```
 SELECT name, image_url FROM hotels ORDER BY id;
 ```
 
-1. Drop files into:
+### ขั้นตอนเพิ่มรูปภาพ
+
+1. นำไฟล์ไปวางในโฟลเดอร์ที่เกี่ยวข้อง
    ```
    frontend/public/images/hotels/
    frontend/public/images/rooms/
    frontend/public/images/facilities/
    frontend/public/images/login/
    ```
-2. Point the relevant field at that path:
-   - **Hotels**: set the Image path field on `/admin/hotels` (maps to
-     `Hotel.imageUrl`), e.g. `/images/hotels/hotel-01.jpg`.
-   - **Rooms**: set the Image path field on `/admin/rooms` (maps to
-     `Room.imageUrl`), e.g. `/images/rooms/family-room.jpg`.
-   - **Home hero**: drop a file at exactly `public/images/hotels/hero.jpg` —
-     no admin field for this one, it's a fixed path checked by the homepage.
-   - **Login / Register page**: drop a file at exactly
-     `public/images/login/hotel-login.jpg`.
-   - **Breakfast promo card**: drop a file at exactly
-     `public/images/facilities/breakfast.jpg`, or pass a different
-     `imageUrl` prop to `<PromoCard />` in code.
-3. Recommended sizes: hotel/room cards `1200x800px`, hero image `16:9`
-   landscape, login image `16:9` or `4:3` landscape.
+2. กำหนดค่าในฟิลด์ที่เกี่ยวข้องให้ชี้ไปยังเส้นทางของรูปภาพนั้น
+   - Hotels: กำหนดฟิลด์ Image path ใน `/admin/hotels` ซึ่งเชื่อมโยงกับ `Hotel.imageUrl` ตัวอย่างเช่น `/images/hotels/hotel-01.jpg`
+   - Rooms: กำหนดฟิลด์ Image path ใน `/admin/rooms` ซึ่งเชื่อมโยงกับ `Room.imageUrl` ตัวอย่างเช่น `/images/rooms/family-room.jpg`
+   - Home hero: นำไฟล์ไปวางที่ `public/images/hotels/hero.jpg` โดยต้องใช้ชื่อและตำแหน่งนี้ตรงตามที่กำหนด เพราะหน้าแรกจะตรวจสอบเส้นทางนี้แบบตายตัว ไม่มีฟิลด์สำหรับตั้งค่าผ่านหน้า Admin
+   - หน้า Login / Register: นำไฟล์ไปวางที่ `public/images/login/hotel-login.jpg` โดยใช้ชื่อไฟล์ตามที่กำหนด
+   - การ์ดโปรโมชันอาหารเช้า: นำไฟล์ไปวางที่ `public/images/facilities/breakfast.jpg` หรือส่งค่า `imageUrl` ที่ต้องการไปยัง `<PromoCard />` ในโค้ด
+3. ขนาดรูปภาพที่แนะนำ
+   - การ์ดโรงแรมและห้องพัก: `1200x800px`
+   - ภาพ Hero: แนวนอน อัตราส่วน `16:9`
+   - ภาพหน้า Login: แนวนอน อัตราส่วน `16:9` หรือ `4:3`
 
-Note: the Room Detail gallery and Hotel Detail gallery only show one real
-photo (the main shot) per hotel/room today — the smaller thumbnail slots
-stay as placeholders since the database only stores a single `imageUrl`
-each. Add a `RoomAmenity`-style child table (e.g. `RoomImage`) if you want
-to store and display multiple photos per room.
+หมายเหตุ: ปัจจุบันแกลเลอรีในหน้า Room Detail และ Hotel Detail แสดงรูปภาพจริงเพียงหนึ่งรูป ซึ่งเป็นรูปภาพหลักของห้องพักหรือโรงแรมนั้น ส่วนช่องภาพขนาดย่อที่เหลือยังเป็น Placeholder เนื่องจากฐานข้อมูลจัดเก็บ `imageUrl` เพียงหนึ่งรายการต่อโรงแรมหรือห้องพัก
 
-## 14. How to Create a Reservation (walkthrough)
+หากต้องการจัดเก็บและแสดงรูปภาพหลายรูปต่อห้องพัก สามารถสร้างตารางลูกเพิ่มเติมในลักษณะเดียวกับ `RoomAmenity` เช่น `RoomImage`
 
-1. `POST /api/auth/register` with `fullName`, `email`, `password` (and optional
-   `phone`) → creates a User + linked Guest, returns a JWT and `guestId`.
-   (Or `POST /api/auth/login` if the account already exists.)
-2. `GET /api/hotels` → pick a hotel → `GET /api/rooms?hotelId={id}`.
-3. `POST /api/reservations` (with `Authorization: Bearer {token}`) using the
-   `guestId` from step 1, plus `roomId`, `checkInDate`, `checkOutDate`,
-   `numberOfGuests`. The backend:
-   - verifies the `guestId` belongs to the logged-in user (unless ADMIN),
-   - rejects overlapping bookings for that room,
-   - rejects if `numberOfGuests` exceeds room capacity,
-   - rejects if check-out is not after check-in,
-   - calculates `totalPrice` server-side (nights × price/night),
-   - marks the room `OCCUPIED`.
-4. `POST /api/payments` with `reservationId`, `amount` (must match total),
-   `paymentMethod` → reservation moves to `CONFIRMED`.
-5. `GET /api/reservations/me` any time to see your own bookings and their
-   current status (or `GET /api/reservations/{id}` for one specific booking).
+## 14. วิธีสร้างรายการจอง (How to Create a Reservation)
 
-## 15. How to Test
+1. เรียกใช้ `POST /api/auth/register` พร้อมข้อมูล `fullName`, `email`, `password` และ `phone` ซึ่งเป็นตัวเลือกเสริม
 
-- **Manual via UI**: follow the walkthrough above at `http://localhost:3000`.
-- **Manual via API**: use `curl` or Postman against `http://localhost:8080/api`
-  — remember to send the JWT from `/api/auth/login` as `Authorization: Bearer {token}`.
-- **Double-booking check**: try creating two reservations for the same room
-  with overlapping dates — the second should fail with `409 Room Not Available`.
-- **Validation check**: try `checkOutDate` before `checkInDate`, or
-  `numberOfGuests` greater than room capacity — both return `400 Bad Request`.
-- **Authorization check**: try calling an ADMIN-only endpoint (e.g.
-  `POST /api/hotels`) while logged in as a GUEST — expect `403 Forbidden`.
-  Try calling any protected endpoint with no token — expect `401 Unauthorized`.
+   ขั้นตอนนี้จะสร้าง `User` พร้อม `Guest` ที่เชื่อมโยงกัน และส่ง JWT กับ `guestId` กลับมา
 
-### Test Accounts
+   หากมีบัญชีอยู่แล้ว ให้เรียกใช้ `POST /api/auth/login` แทน
+2. เรียกใช้ `GET /api/hotels` เพื่อเลือกโรงแรม จากนั้นเรียกใช้ `GET /api/rooms?hotelId={id}` เพื่อค้นหาห้องพักของโรงแรมที่เลือก
+3. เรียกใช้ `POST /api/reservations` พร้อมส่วนหัว `Authorization: Bearer {token}` โดยส่งข้อมูลต่อไปนี้
+   - `guestId` ที่ได้รับจากขั้นตอนที่ 1
+   - `roomId`
+   - `checkInDate`
+   - `checkOutDate`
+   - `numberOfGuests`
+   Backend จะดำเนินการตรวจสอบดังนี้
+   - ตรวจสอบว่า `guestId` เป็นของผู้ใช้ที่เข้าสู่ระบบอยู่หรือไม่ เว้นแต่ผู้ใช้จะเป็น `ADMIN`
+   - ปฏิเสธการจองที่มีช่วงเวลาทับซ้อนกับรายการจองเดิมของห้องเดียวกัน
+   - ปฏิเสธการจองหาก `numberOfGuests` มากกว่าความจุของห้องพัก
+   - ปฏิเสธการจองหากวันเช็กเอาต์ไม่ใช่วันที่หลังจากวันเช็กอิน
+   - คำนวณ `totalPrice` บนเซิร์ฟเวอร์ โดยใช้จำนวนคืนคูณราคาต่อคืน
+   - เปลี่ยนสถานะห้องพักเป็น `OCCUPIED`
+4. เรียกใช้ `POST /api/payments` พร้อมข้อมูล `reservationId`, `amount` ซึ่งต้องตรงกับยอดรวมที่คำนวณไว้ และ `paymentMethod`
 
-> These credentials are documented **only here**. They are deliberately not
-> shown on the login page, in source comments or in the logs. They exist only
-> while `APP_SEED_DEMO_ACCOUNTS=true` (the local-development default) and
-> `admin@hotel.com` keeps the demo password unless you set
-> `APP_SEED_ADMIN_PASSWORD` **before the first start**. Never deploy publicly
-> with these accounts enabled.
+   เมื่อดำเนินการสำเร็จ สถานะการจองจะเปลี่ยนเป็น `CONFIRMED`
+5. สามารถเรียกใช้ `GET /api/reservations/me` ได้ทุกเมื่อเพื่อดูรายการจองของตนเองและสถานะปัจจุบัน หรือใช้ `GET /api/reservations/{id}` เพื่อดูรายละเอียดของรายการจองรายการใดรายการหนึ่งโดยเฉพาะ
 
-`DataInitializer` (a Spring `CommandLineRunner`) seeds these automatically
-every time the backend starts, so they're ready to use immediately:
+## 15. วิธีทดสอบระบบ (How to Test)
 
-| Login | Password | Role | What it demonstrates |
-|---|---|---|---|
-| **admin@hotel.com** | `admin123` | ADMIN | Manage the dashboard, add rooms, confirm/cancel, check-in/check-out at `/admin`. Also the only role that can record a payout as paid or change a hotel's commission rate - see `/admin/payouts` |
-| **owner1@hotel.com** | `Owner@2026!` | HOTEL_OWNER | Manages Mandarin Oriental, Bangkok (hotel id 1) only. Visit `/admin/payouts` to see this hotel's `PENDING` payout (from Somchai's reservation 1) and its 15% commission rate (view-only - only ADMIN can change it) |
-| **owner6@hotel.com** | `Owner@2026!` | HOTEL_OWNER | Manages Shangri-La Chiang Mai (hotel id 6). Its payout (from guest1's reservation 2) is already `PAID` - `/admin/payouts` shows what settled payout history looks like |
-| *(owner2 .. owner20@hotel.com)* | `Owner@2026!` | HOTEL_OWNER | Same pattern, one account per remaining hotel - see `DataInitializer.java` |
-| **guest1@test.com** | `guest123` | GUEST | A fully successful flow: booked, paid, confirmed. Has a `CONFIRMED` + `PAID` reservation (room id 36 - Shangri-La Chiang Mai SUITE, 2026-10-10 → 2026-10-13) and a second, already-completed stay (room id 7 - The Peninsula Bangkok, `CHECKED_OUT`) with a seeded review. Log in and visit `/reservations` for the booking history, or `/reservations/history` to demo "Edit review" on the completed stay |
-| **guest2@test.com** | `guest123` | GUEST | Testing `409 Room Not Available`. From `/rooms/36`, click **New Booking** and try to book overlapping dates (e.g. 2026-10-11 → 2026-10-12) — the API rejects the double-booking |
-| **guest3@test.com** | `guest123` | GUEST | Testing cancellation and `400 Bad Request`. Has a `PENDING` reservation (id 3). Log in, go to `/reservations`, cancel it, or send `PUT /api/reservations/3` (as admin) with `checkOutDate` before `checkInDate` to see the validation error |
+- ทดสอบด้วยตนเองผ่าน UI: ทำตามขั้นตอนในหัวข้อก่อนหน้าผ่าน `http://localhost:3000`
+- ทดสอบด้วยตนเองผ่าน API: ใช้ `curl` หรือ Postman เรียก API ที่ `http://localhost:8080/api` โดยต้องส่ง JWT ที่ได้รับจาก `/api/auth/login` ผ่านส่วนหัว `Authorization: Bearer {token}`
+- ตรวจสอบการจองห้องเดียวกันซ้ำ: ทดลองสร้างการจองสองรายการสำหรับห้องเดียวกัน โดยมีช่วงเวลาทับซ้อนกัน รายการที่สองควรถูกปฏิเสธพร้อมข้อผิดพลาด `409 Room Not Available`
+- ตรวจสอบการตรวจสอบความถูกต้องของข้อมูล: ทดลองกำหนด `checkOutDate` ให้เป็นวันที่ก่อน `checkInDate` หรือกำหนด `numberOfGuests` ให้มากกว่าความจุของห้อง ทั้งสองกรณีควรส่ง `400 Bad Request` กลับมา
+- ตรวจสอบการกำหนดสิทธิ์: ทดลองเรียก Endpoint ที่อนุญาตเฉพาะ `ADMIN` เช่น `POST /api/hotels` ขณะที่เข้าสู่ระบบด้วยบัญชี `GUEST` ผลที่คาดหวังคือ `403 Forbidden` และหากเรียก Endpoint ที่ต้องมีการยืนยันตัวตนโดยไม่ส่งโทเคน ควรได้รับ `401 Unauthorized`
 
-You can also click **Create account** on `/login` to register a brand new
-guest at any time — that goes through the real `/api/auth/register` endpoint.
-To try the "Write a review" flow from scratch: as `admin@hotel.com`, check
-any `CONFIRMED` reservation in through `/admin` (check-in, then check-out) to
-make it `CHECKED_OUT`, then log in as the guest who booked it and open
-`/reservations/history`.
+### บัญชีสำหรับทดสอบ (Test Accounts)
 
-To try the payouts flow end to end: log in as `admin@hotel.com` and open
-`/admin/payouts` - pick "The Peninsula Bangkok" (or leave "All hotels") and
-click **Mark as paid** on its `PENDING` payout, filling in a payout method
-and reference. Refresh as `owner2@hotel.com` afterward to see it show up as
-`PAID` from the hotel's side. To see a rate change take effect, edit the
-commission rate for a hotel with no payouts yet (anything other than 1, 2,
-or 6), then pay for a new booking there - the new payout will use the
-updated rate, while every existing payout keeps the rate it was actually
-charged under.
+> ข้อมูลรับรองการเข้าสู่ระบบเหล่านี้มีการระบุไว้ เฉพาะในเอกสารส่วนนี้เท่านั้น โดยตั้งใจไม่แสดงไว้ในหน้า Login ความคิดเห็นใน Source Code หรือ Log ของระบบ บัญชีเหล่านี้จะมีอยู่เฉพาะเมื่อ `APP_SEED_DEMO_ACCOUNTS=true` ซึ่งเป็นค่าเริ่มต้นสำหรับการพัฒนาในเครื่อง และบัญชี `admin@hotel.com` จะยังใช้รหัสผ่านสาธิต เว้นแต่คุณจะกำหนด `APP_SEED_ADMIN_PASSWORD` ก่อนเริ่มระบบครั้งแรก ห้าม Deploy ระบบสู่สาธารณะโดยเปิดใช้งานบัญชีเหล่านี้
 
-## 16. Common Errors & Fixes
+`DataInitializer` ซึ่งเป็น `Spring CommandLineRunner` จะสร้างบัญชีเหล่านี้โดยอัตโนมัติเมื่อ Backend เริ่มทำงาน เพื่อให้สามารถนำไปใช้งานได้ทันที
 
-| Error | Likely cause | Fix |
-|---|---|---|
-| `Communications link failure` on backend startup | MySQL not running, or wrong host/port | Start MySQL; verify `spring.datasource.url` |
-| `Access denied for user 'root'@'localhost'` | Wrong password in `application.properties` | Update `spring.datasource.password` |
-| Frontend shows "No hotels found" | Backend not running, or DB not seeded | Start backend; run `database/schema.sql` |
-| CORS error in browser console | Frontend running on a port other than 3000 | Update `corsConfigurationSource()` in `SecurityConfig.java` |
-| `401 Unauthorized` | No/expired JWT sent, or user not logged in | Log in again; check `Authorization: Bearer {token}` header |
-| `403 Forbidden` | Logged in, but wrong role (e.g. GUEST hitting an ADMIN route) or trying to access another guest's reservation | Log in as `admin@hotel.com` for admin actions, or use the account that owns the resource |
-| `409 Room Not Available` | Selected dates overlap an existing reservation for that room | Choose different dates or a different room |
-| `400 Bad Request` on booking | Check-out before check-in, or guests > capacity | Fix the form inputs |
-| Admin pages keep redirecting to `/login` | The `hotel_auth_role` cookie is missing/stale, or the account isn't ADMIN | Log out and back in as `admin@hotel.com`; check devtools cookies |
+| บัญชีเข้าสู่ระบบ               | รหัสผ่าน      | บทบาท       | สิ่งที่ใช้สาธิต                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| ------------------------------ | ------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| admin\@hotel.com               | `admin123`    | ADMIN       | จัดการแดชบอร์ด เพิ่มห้องพัก ยืนยันหรือยกเลิกการจอง เช็กอินและเช็กเอาต์ผ่าน `/admin` นอกจากนี้ยังเป็นบทบาทเดียวที่สามารถบันทึก Payout ว่าจ่ายเงินแล้ว หรือเปลี่ยนอัตราค่าคอมมิชชันของโรงแรมได้ ดูที่ `/admin/payouts`                                                                                                                                                                                                                                                                                                                 |
+| owner1\@hotel.com              | `Owner@2026!` | HOTEL_OWNER | จัดการเฉพาะ Mandarin Oriental, Bangkok ซึ่งมี ID โรงแรมเป็น 1 ไปที่ `/admin/payouts` เพื่อดู Payout สถานะ `PENDING` ของโรงแรมนี้ ซึ่งมาจากรายการจองหมายเลข 1 ของ Somchai และดูอัตราค่าคอมมิชชัน 15% ได้ แต่เปลี่ยนไม่ได้ เพราะมีเพียง ADMIN ที่เปลี่ยนได้                                                                                                                                                                                                                                                                            |
+| owner6\@hotel.com              | `Owner@2026!` | HOTEL_OWNER | จัดการเฉพาะ Shangri-La Chiang Mai ซึ่งมี ID โรงแรมเป็น 6 โดย Payout ของโรงแรมนี้จากรายการจองหมายเลข 2 ของ guest1 มีสถานะ `PAID` แล้ว หน้า `/admin/payouts` จะแสดงตัวอย่างประวัติ Payout ที่ชำระเงินเรียบร้อย                                                                                                                                                                                                                                                                                                                         |
+| (owner2 .. owner20\@hotel.com) | `Owner@2026!` | HOTEL_OWNER | ใช้รูปแบบเดียวกัน โดยมีหนึ่งบัญชีต่อโรงแรมที่เหลือ ดูรายละเอียดได้ใน `DataInitializer.java`                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| guest1\@test.com               | `guest123`    | GUEST       | ใช้ทดสอบขั้นตอนที่สำเร็จครบถ้วน ได้แก่ จอง ชำระเงิน และยืนยันการจองแล้ว มีรายการจองสถานะ `CONFIRMED` พร้อมการชำระเงิน `PAID` สำหรับห้องหมายเลข 36 ซึ่งเป็นห้อง SUITE ของ Shangri-La Chiang Mai ระหว่างวันที่ 2026-10-10 ถึง 2026-10-13 และมีการเข้าพักที่เสร็จสมบูรณ์อีกหนึ่งรายการสำหรับห้องหมายเลข 7 ของ The Peninsula Bangkok ซึ่งมีสถานะ `CHECKED_OUT` และมีรีวิวเริ่มต้นอยู่แล้ว เข้าสู่ระบบแล้วเปิด `/reservations` เพื่อดูประวัติการจอง หรือเปิด `/reservations/history` เพื่อสาธิตการแก้ไขรีวิวของการเข้าพักที่เสร็จสิ้นแล้ว |
+| guest2\@test.com               | `guest123`    | GUEST       | ใช้ทดสอบข้อผิดพลาด `409 Room Not Available` เปิด `/rooms/36` คลิก New Booking แล้วทดลองจองช่วงวันที่ทับซ้อนกัน เช่น 2026-10-11 ถึง 2026-10-12 ระบบ API ควรปฏิเสธการจองห้องซ้ำ                                                                                                                                                                                                                                                                                                                                                        |
+| guest3\@test.com               | `guest123`    | GUEST       | ใช้ทดสอบการยกเลิกและข้อผิดพลาด `400 Bad Request` โดยมีรายการจองสถานะ `PENDING` หมายเลข 3 เข้าสู่ระบบแล้วเปิด `/reservations` เพื่อยกเลิกรายการดังกล่าว หรือส่ง `PUT /api/reservations/3` ในฐานะ Admin โดยกำหนด `checkOutDate` ให้เป็นวันที่ก่อน `checkInDate` เพื่อดูข้อผิดพลาดจากการตรวจสอบข้อมูล                                                                                                                                                                                                                                   |
 
-## 17. Project Structure
+คุณสามารถคลิก Create account ในหน้า `/login` เพื่อสมัครบัญชีผู้เข้าพักใหม่ได้ทุกเมื่อ โดยระบบจะเรียกใช้ Endpoint จริง `POST /api/auth/register`
+
+หากต้องการทดลองขั้นตอน Write a review ตั้งแต่ต้น ให้เข้าสู่ระบบด้วย `admin@hotel.com` แล้วเลือกการจองที่มีสถานะ `CONFIRMED` รายการใดก็ได้ในหน้า `/admin` จากนั้นดำเนินการเช็กอินและเช็กเอาต์เพื่อให้สถานะเปลี่ยนเป็น `CHECKED_OUT` แล้วเข้าสู่ระบบด้วยบัญชีผู้เข้าพักที่เป็นเจ้าของการจองนั้น และเปิด `/reservations/history`
+
+หากต้องการทดลองกระบวนการ Payout ตั้งแต่ต้นจนจบ ให้เข้าสู่ระบบด้วย `admin@hotel.com` แล้วเปิด `/admin/payouts`
+
+เลือกโรงแรม The Peninsula Bangkok หรือปล่อยตัวกรองไว้ที่ `"All hotels"` จากนั้นคลิก Mark as paid บน Payout ที่มีสถานะ `PENDING` พร้อมกรอกวิธีจ่ายเงินและเลขอ้างอิงธุรกรรม
+
+หลังจากนั้นให้รีเฟรชหน้าเว็บโดยเข้าสู่ระบบด้วย `owner2@hotel.com` เพื่อดูว่า Payout ดังกล่าวแสดงเป็น `PAID` จากฝั่งโรงแรม
+
+หากต้องการดูผลของการเปลี่ยนอัตราค่าคอมมิชชัน ให้เลือกโรงแรมที่ยังไม่มี Payout เกิดขึ้น โดยเลือกโรงแรมใดก็ได้ที่ไม่ใช่โรงแรมหมายเลข 1, 2 หรือ 6 จากนั้นแก้ไขอัตราค่าคอมมิชชันและชำระเงินสำหรับการจองใหม่ที่โรงแรมนั้น
+
+Payout ใหม่จะใช้อัตราค่าคอมมิชชันที่อัปเดตแล้ว ขณะที่ Payout เดิมทุกรายการจะยังคงใช้อัตราที่ถูกนำมาใช้จริงในช่วงเวลาที่มีการเรียกเก็บเงิน
+
+## 16. ข้อผิดพลาดที่พบบ่อยและวิธีแก้ไข (Common Errors & Fixes)
+
+| ข้อผิดพลาด                                       | สาเหตุที่เป็นไปได้                                                                                            | วิธีแก้ไข                                                                                          |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `Communications link failure` เมื่อเริ่ม Backend | MySQL ยังไม่ทำงาน หรือกำหนด Host/Port ไม่ถูกต้อง                                                              | เริ่ม MySQL และตรวจสอบ `spring.datasource.url`                                                     |
+| `Access denied for user 'root'@'localhost'`      | รหัสผ่านใน `application.properties` ไม่ถูกต้อง                                                                | แก้ไข `spring.datasource.password`                                                                 |
+| Frontend แสดง `"No hotels found"`                | Backend ไม่ทำงาน หรือฐานข้อมูลยังไม่มีข้อมูลเริ่มต้น                                                          | เริ่ม Backend และเรียกใช้ `database/schema.sql`                                                    |
+| CORS error ใน Console ของเบราว์เซอร์             | Frontend ทำงานบน Port อื่นที่ไม่ใช่ 3000                                                                      | อัปเดต `corsConfigurationSource()` ใน `SecurityConfig.java`                                        |
+| `401 Unauthorized`                               | ไม่มี JWT ส่งมา โทเคนหมดอายุ หรือผู้ใช้ยังไม่ได้เข้าสู่ระบบ                                                   | เข้าสู่ระบบอีกครั้ง และตรวจสอบส่วนหัว `Authorization: Bearer {token}`                              |
+| `403 Forbidden`                                  | เข้าสู่ระบบแล้วแต่มีบทบาทไม่ถูกต้อง เช่น `GUEST` เรียก ADMIN Route หรือพยายามเข้าถึงการจองของผู้เข้าพักคนอื่น | เข้าสู่ระบบด้วย `admin@hotel.com` สำหรับการดำเนินการของ Admin หรือใช้บัญชีที่เป็นเจ้าของข้อมูลนั้น |
+| `409 Room Not Available`                         | วันที่เลือกทับซ้อนกับรายการจองเดิมของห้องนั้น                                                                 | เลือกวันที่อื่นหรือเปลี่ยนห้องพัก                                                                  |
+| `400 Bad Request` ขณะจอง                         | วันเช็กเอาต์อยู่ก่อนวันเช็กอิน หรือจำนวนผู้เข้าพักมากกว่าความจุของห้อง                                        | แก้ไขข้อมูลในแบบฟอร์ม                                                                              |
+| หน้า Admin เปลี่ยนเส้นทางไป `/login` ซ้ำ ๆ       | คุกกี้ `hotel_auth_role` หายไป มีค่าเก่า หรือบัญชีที่ใช้ไม่ใช่ ADMIN                                          | ออกจากระบบแล้วเข้าสู่ระบบใหม่ด้วย `admin@hotel.com` และตรวจสอบคุกกี้ใน Developer Tools             |
+
+## 17. โครงสร้างโปรเจกต์ (Project Structure)
 
 ```
 hotel-reservation-system/
@@ -596,96 +660,136 @@ hotel-reservation-system/
 │       ├── controller/   (HotelController, RoomController, GuestController,
 │       │                  ReservationController, PaymentController,
 │       │                  ReviewController, PayoutController, AuthController)
-│       ├── service/      (business rules incl. double-booking prevention,
-│       │                  ownership checks, AuthService, ReviewService -
-│       │                  only lets a CHECKED_OUT stay be reviewed once,
-│       │                  PayoutService - auto-creates a Payout per Payment,
-│       │                  net of the hotel's commission)
-│       ├── repository/   (Spring Data JPA interfaces, incl. UserRepository,
-│       │                  ReviewRepository, PayoutRepository)
+│       ├── service/      (กฎทางธุรกิจ รวมถึงการป้องกันการจองซ้ำ
+│       │                  การตรวจสอบความเป็นเจ้าของข้อมูล AuthService,
+│       │                  ReviewService - อนุญาตให้รีวิวได้เฉพาะการเข้าพัก
+│       │                  ที่ CHECKED_OUT แล้ว และรีวิวได้เพียงครั้งเดียว
+│       │                  PayoutService - สร้าง Payout อัตโนมัติต่อ Payment
+│       │                  โดยหักค่าคอมมิชชันของโรงแรม)
+│       ├── repository/   (Spring Data JPA interfaces รวมถึง UserRepository,
+│       │                  ReviewRepository และ PayoutRepository)
 │       ├── entity/       (Hotel, Room, RoomAmenity, Guest, Reservation,
-│       │                  Payment, User, Review, Payout, enums incl. Role,
-│       │                  AmenityCategory, PayoutStatus, PayoutMethod)
-│       ├── dto/          (validated request bodies, incl. RoomAmenityDto,
-│       │                  RegisterRequest, LoginRequest, AuthResponse,
-│       │                  ReviewDto, ReviewResponseDto, ReviewSummaryDto,
-│       │                  PayoutPaymentDto, PayoutSummaryDto, CommissionRateDto)
+│       │                  Payment, User, Review, Payout และ enums
+│       │                  เช่น Role, AmenityCategory, PayoutStatus, PayoutMethod)
+│       ├── dto/          (Request Body ที่ผ่านการตรวจสอบความถูกต้อง
+│       │                  รวมถึง RoomAmenityDto, RegisterRequest,
+│       │                  LoginRequest, AuthResponse, ReviewDto,
+│       │                  ReviewResponseDto, ReviewSummaryDto,
+│       │                  PayoutPaymentDto, PayoutSummaryDto,
+│       │                  CommissionRateDto)
 │       ├── security/     (JwtService, JwtAuthenticationFilter,
 │       │                  CustomUserDetailsService, CurrentUserProvider)
-│       ├── exception/    (custom exceptions + GlobalExceptionHandler)
-│       └── config/       (SecurityConfig - JWT filter chain, CORS, route
-│                          authorization; DataInitializer - seeds admin/test
-│                          guest logins on startup)
+│       ├── exception/    (Custom Exceptions และ GlobalExceptionHandler)
+│       └── config/       (SecurityConfig - JWT filter chain, CORS,
+│                          การกำหนดสิทธิ์ของแต่ละ Route
+│                          DataInitializer - สร้างบัญชี Admin และบัญชี
+│                          Guest สำหรับทดสอบเมื่อเริ่มระบบ)
 ├── frontend/
-│   ├── app/              (Next.js App Router pages, see below)
+│   ├── app/              (หน้าเว็บ Next.js App Router)
 │   ├── components/       (Navbar, Sidebar, Footer, HotelCard, RoomCard,
 │   │                      RoomHeroGallery, RoomAmenitiesSidebar,
 │   │                      AvailabilityCalendar, AdvanceBookingList,
 │   │                      PromoCard, HotelMap, StarRating, ReviewFormModal,
 │   │                      HotelReviews, ...)
-│   ├── lib/               (api.ts - all fetch calls incl. auth + token
-│   │                      handling, types.ts - shared types,
+│   ├── lib/              (api.ts - คำขอ fetch ทั้งหมด รวมถึงการยืนยันตัวตน
+│   │                      และการจัดการ Token
+│   │                      types.ts - ประเภทข้อมูลที่ใช้ร่วมกัน
 │   │                      auth-context.tsx - AuthProvider/useAuth)
-│   ├── middleware.ts     (edge-level /admin/** guard based on role cookie)
-│   └── public/images/    (hotels/rooms/facilities/login - drop real photos here)
+│   ├── middleware.ts     (ตัวกรองระดับ Edge สำหรับ /admin/** โดยอิงจาก
+│   │                      คุกกี้บทบาทผู้ใช้)
+│   └── public/images/    (โรงแรม/ห้องพัก/สิ่งอำนวยความสะดวก/Login
+│                          สำหรับจัดเก็บรูปภาพจริง)
 ├── database/
-│   └── schema.sql        (DDL + seed data: 20 hotels, 120 rooms - every
-│                          hotel offers all 6 room types - users table
-│                          structure - passwords seeded by DataInitializer)
+│   └── schema.sql        (DDL + Seed Data: โรงแรม 20 แห่ง ห้องพัก 120 ห้อง
+│                          ทุกโรงแรมมีห้องพักครบทั้ง 6 ประเภท
+│                          โครงสร้างตาราง users
+│                          รหัสผ่านเริ่มต้นถูกสร้างโดย DataInitializer)
 ├── README.md
 └── .gitignore
 ```
 
-### Frontend pages
+### หน้าเว็บฝั่ง Frontend (Frontend Pages)
+
 ```
-/                      Home (hero, search, featured hotels)
-/login                 Login - calls POST /api/auth/login
-/register              Create account - calls POST /api/auth/register
-/hotels                Hotel list with filters
-/hotels/[id]           Hotel detail (gallery, rooms, map + "Get directions"
-                       widget, guest reviews - average rating + "Write a
-                       review" for eligible logged-in guests)
-/rooms/[id]            Room detail: hero gallery + badges, availability
-                       calendar, amenities sidebar, advance booking list,
-                       complimentary breakfast promo card
-/booking               Booking form + live price summary (requires login)
-/payment               Payment form → success screen (requires login)
-/reservations          My reservations - GET /api/reservations/me (requires login)
-/reservations/[id]     Reservation detail with status timeline (owner or admin)
-/reservations/history  Checked-out + cancelled stays - write/edit a review
-                       on any completed stay (requires login)
-/admin                 Dashboard (stats, charts, recent reservations) -
-                       ADMIN, HOTEL_OWNER, or HOTEL_STAFF (scoped to their own hotel)
-/admin/hotels          Hotel CRUD - ADMIN can create/delete any hotel; a
-                       hotel's own HOTEL_OWNER/HOTEL_STAFF with
-                       MANAGE_HOTEL_INFO can edit (not create/delete) theirs
-/admin/rooms           Room CRUD + status change (incl. floor, amenities via
-                       API) - ADMIN, or a hotel's own HOTEL_OWNER/HOTEL_STAFF
-                       with MANAGE_ROOMS
-/admin/reservations    Reservation management (confirm/cancel/check-in/out) -
-                       ADMIN, or a hotel's own HOTEL_OWNER/HOTEL_STAFF with
-                       MANAGE_RESERVATIONS or VIEW_FINANCE
-/admin/payouts         Payouts dashboard: what the platform owes each hotel
-                       net of commission, and payout history. ADMIN sees
-                       every hotel (with a hotel filter) and can mark a
-                       payout as paid or change a hotel's commission rate;
-                       a hotel's own HOTEL_OWNER/HOTEL_STAFF with
-                       VIEW_FINANCE see their own hotel's payouts read-only
-/admin/staff           Manage a hotel's HOTEL_STAFF accounts + permissions -
-                       ADMIN or that hotel's HOTEL_OWNER
+/                      หน้าแรก (Hero, การค้นหา, โรงแรมแนะนำ)
+
+/login                 หน้าเข้าสู่ระบบ - เรียก POST /api/auth/login
+
+/register              สมัครบัญชี - เรียก POST /api/auth/register
+
+/hotels                รายการโรงแรมพร้อมตัวกรอง
+
+/hotels/[id]           รายละเอียดโรงแรม (แกลเลอรี, ห้องพัก, แผนที่และ
+                       วิดเจ็ต "Get directions", รีวิวผู้เข้าพัก
+                       คะแนนเฉลี่ย และ "Write a review" สำหรับผู้ใช้
+                       ที่เข้าสู่ระบบและมีสิทธิ์รีวิว)
+
+/rooms/[id]            รายละเอียดห้องพัก: Hero Gallery พร้อมป้ายกำกับ,
+                       ปฏิทินแสดงความพร้อมในการจอง, แถบสิ่งอำนวยความสะดวก,
+                       รายการจองล่วงหน้า และการ์ดโปรโมชันอาหารเช้าฟรี
+
+/booking               แบบฟอร์มการจอง + สรุปราคาที่อัปเดตแบบเรียลไทม์
+                       (ต้องเข้าสู่ระบบ)
+
+/payment               แบบฟอร์มชำระเงิน → หน้าจอแสดงความสำเร็จ
+                       (ต้องเข้าสู่ระบบ)
+
+/reservations          รายการจองของฉัน - GET /api/reservations/me
+                       (ต้องเข้าสู่ระบบ)
+
+/reservations/[id]     รายละเอียดการจองพร้อมไทม์ไลน์สถานะ
+                       (เจ้าของรายการหรือ Admin)
+
+/reservations/history  ประวัติการเข้าพักที่เช็กเอาต์แล้วและรายการที่ยกเลิก
+                       สามารถเขียนหรือแก้ไขรีวิวสำหรับการเข้าพักที่เสร็จสิ้นแล้ว
+                       (ต้องเข้าสู่ระบบ)
+
+/admin                 แดชบอร์ด (สถิติ, กราฟ, รายการจองล่าสุด)
+                       ADMIN, HOTEL_OWNER หรือ HOTEL_STAFF
+                       โดยจำกัดข้อมูลให้เห็นเฉพาะโรงแรมของตนเอง
+
+/admin/hotels          จัดการข้อมูลโรงแรมแบบ CRUD
+                       ADMIN สามารถสร้างหรือลบโรงแรมใดก็ได้
+                       HOTEL_OWNER/HOTEL_STAFF ของโรงแรมนั้น
+                       ที่มีสิทธิ์ MANAGE_HOTEL_INFO สามารถแก้ไขโรงแรมของตนเอง
+                       แต่ไม่สามารถสร้างหรือลบโรงแรมได้
+
+/admin/rooms           จัดการข้อมูลห้องพักแบบ CRUD และเปลี่ยนสถานะ
+                       รวมถึงชั้นของห้องและสิ่งอำนวยความสะดวกผ่าน API
+                       ADMIN หรือ HOTEL_OWNER/HOTEL_STAFF ของโรงแรมนั้น
+                       ที่มีสิทธิ์ MANAGE_ROOMS
+
+/admin/reservations     จัดการการจอง (ยืนยัน/ยกเลิก/เช็กอิน/เช็กเอาต์)
+                        ADMIN หรือ HOTEL_OWNER/HOTEL_STAFF ของโรงแรมนั้น
+                        ที่มีสิทธิ์ MANAGE_RESERVATIONS หรือ VIEW_FINANCE
+
+/admin/payouts          แดชบอร์ด Payout: เงินที่แพลตฟอร์มต้องจ่ายให้แต่ละโรงแรม
+                        หลังหักค่าคอมมิชชัน พร้อมประวัติการจ่ายเงิน
+                        ADMIN สามารถดูทุกโรงแรมโดยใช้ตัวกรองโรงแรม
+                        และทำเครื่องหมายว่าจ่ายเงินแล้วหรือเปลี่ยนอัตรา
+                        ค่าคอมมิชชันได้
+                        HOTEL_OWNER/HOTEL_STAFF ของโรงแรมนั้น
+                        ที่มีสิทธิ์ VIEW_FINANCE สามารถดู Payout
+                        ของโรงแรมตนเองได้แบบอ่านอย่างเดียว
+
+/admin/staff            จัดการบัญชี HOTEL_STAFF ของโรงแรมและสิทธิ์ที่ได้รับ
+                        ADMIN หรือ HOTEL_OWNER ของโรงแรมนั้น
 ```
 
-## 18. Design System
+## 18. ระบบการออกแบบ (Design System)
 
-| Token | Value |
-|---|---|
-| Background | `#F7F3EC` |
-| Primary | `#A88A5A` |
-| Dark | `#292722` |
-| Secondary | `#D8C8AD` |
-| Card | `#FFFFFF` |
-| Text | `#3A3834` |
-| Muted | `#8B877F` |
+ตารางต่อไปนี้แสดงค่าตัวแปรสีที่ใช้ในระบบ
 
-Rounded cards (`20px`), soft shadows, generous whitespace, minimal color use —
-warm, earth-toned, premium rather than a generic admin-dashboard look.
+| ตัวแปร                         | ค่า       |
+| ------------------------------ | --------- |
+| Background — สีพื้นหลัง        | `#F7F3EC` |
+| Primary — สีหลัก               | `#A88A5A` |
+| Dark — สีเข้ม                  | `#292722` |
+| Secondary — สีรอง              | `#D8C8AD` |
+| Card — สีพื้นหลังการ์ด         | `#FFFFFF` |
+| Text — สีข้อความ               | `#3A3834` |
+| Muted — สีข้อความที่ลดความเด่น | `#8B877F` |
+
+การออกแบบใช้การ์ดที่มีมุมโค้งมนขนาด `20px` เงาที่นุ่มนวล พื้นที่ว่างที่กว้างขวาง และการใช้สีอย่างจำกัด เพื่อสร้างภาพลักษณ์ที่อบอุ่น หรูหรา และมีระดับ โดยใช้โทนสีเอิร์ธโทน แทนการออกแบบที่ดูเหมือนแดชบอร์ดผู้ดูแลระบบทั่วไป
+
+หมายเหตุ: คำแปลนี้คงชื่อไฟล์ ชื่อตัวแปร คำสั่ง โค้ด API เส้นทาง URL และค่าตัวอย่างต่าง ๆ ตามต้นฉบับ เพื่อให้สามารถนำไปใช้อ้างอิงกับโปรเจกต์ได้โดยตรงครับ
