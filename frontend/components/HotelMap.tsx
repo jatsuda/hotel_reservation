@@ -297,22 +297,28 @@ export default function HotelMap({ name, latitude, longitude, className = "" }: 
             placeholder="Enter your address"
             className="w-full min-w-0 rounded-control border border-secondary/60 bg-white px-3 py-2 text-sm text-text focus:border-primary focus:outline-none"
           />
-          <div className="flex gap-2">
+          <div className="flex min-w-0 gap-2">
             <button
               type="button"
               onClick={handleUseMyLocation}
               disabled={locating || routePending}
-              className="flex flex-1 items-center justify-center gap-1.5 rounded-control border border-secondary/60 px-3 py-2 text-xs font-medium text-text hover:bg-secondary/30 disabled:opacity-50"
+              className="flex min-w-0 flex-1 items-center justify-center gap-1.5 rounded-control border border-secondary/60 px-2 py-2 text-xs font-medium text-text hover:bg-secondary/30 disabled:opacity-50"
             >
-              <Locate className="h-3.5 w-3.5" />{" "}
-              {locating ? "Locating..." : routePending ? "Finding route..." : "Use my location"}
+              <Locate className="h-3.5 w-3.5 shrink-0" />
+              <span className="min-w-0 whitespace-normal break-words text-center leading-tight">
+                {locating
+                  ? "Locating..."
+                  : routePending
+                    ? "Finding route..."
+                    : "Use my location"}
+              </span>
             </button>
+
             {(origin || address.trim()) && (
               <button
                 type="button"
                 onClick={resetToHotelView}
-                className="flex items-center justify-center rounded-control border border-secondary/60 px-2 py-2 text-text hover:bg-secondary/30"
-                aria-label="Clear"
+                className="flex shrink-0 items-center justify-center rounded-control border border-secondary/60 px-2 py-2 text-text hover:bg-secondary/30"                aria-label="Clear"
                 title="Clear"
               >
                 <X className="h-3.5 w-3.5" />
