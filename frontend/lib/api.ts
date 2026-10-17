@@ -21,7 +21,9 @@ import type {
   UpcomingReservation,
 } from "./types";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api";
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL ||
+  "https://hotel-reservation-pdau.onrender.com/api";
 const TOKEN_KEY = "hotel_auth_token";
 
 class ApiRequestError extends Error {
